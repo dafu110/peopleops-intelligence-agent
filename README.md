@@ -49,6 +49,8 @@ python -m streamlit run app.py
 
 Open `http://localhost:8501`.
 
+On Windows, if dependency installation fails while unpacking `torch` because the repository path is too deep, use the short-path setup in [`docs/clean-install-and-test.md`](docs/clean-install-and-test.md).
+
 ## API Backend
 
 ```powershell
@@ -93,6 +95,10 @@ When `ACCESS_PASSWORD` is configured, pass `X-Access-Password`.
 python -m py_compile app.py api.py core\config.py core\auth.py core\database.py core\security.py core\audit.py core\tools.py core\pdf_utils.py core\workflow.py core\rag_engine.py core\matcher.py
 python -m unittest discover -s tests
 ```
+
+Clean-install validation notes and a test evidence screenshot are available in [`docs/clean-install-and-test.md`](docs/clean-install-and-test.md).
+
+![PeopleOps Agent Platform test evidence](docs/test-evidence-2026-06-24.png)
 
 RAG evaluation:
 
