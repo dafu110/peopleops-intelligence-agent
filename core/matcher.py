@@ -1,8 +1,5 @@
 from typing import Any, Dict, List
 
-from langchain_core.output_parsers import SimpleJsonOutputParser
-from langchain_core.prompts import ChatPromptTemplate
-
 from .config import get_chat_model
 
 
@@ -35,6 +32,9 @@ def normalize_analysis(raw: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def analyze_resume(resume_text: str, jd_text: str) -> dict:
+    from langchain_core.output_parsers import SimpleJsonOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
+
     prompt = ChatPromptTemplate.from_messages(
         [
             (

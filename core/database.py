@@ -44,7 +44,8 @@ def utc_now() -> str:
 def init_db() -> None:
     settings = get_settings()
     settings.db_path.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(settings.db_path) as conn:
+    conn = sqlite3.connect(settings.db_path)
+    try:
         conn.executescript(SCHEMA)
         conn.execute(
             """
@@ -53,6 +54,9 @@ def init_db() -> None:
             """,
             ("local-admin", "admin", utc_now()),
         )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 @contextmanager

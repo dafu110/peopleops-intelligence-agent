@@ -2,9 +2,8 @@ import os
 import importlib
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 from core.audit import read_audit_events, write_audit_event
 from core.auth import Principal, has_permission
@@ -104,7 +103,7 @@ class IsolatedRuntimeMixin:
 
 class ToolExecutionTests(IsolatedRuntimeMixin, unittest.TestCase):
     def test_parse_interview_window_handles_iso_time(self):
-        now = datetime(2026, 6, 18, 9, 0, tzinfo=ZoneInfo("Asia/Shanghai"))
+        now = datetime(2026, 6, 18, 9, 0, tzinfo=timezone(timedelta(hours=8), name="Asia/Shanghai"))
 
         window = parse_interview_window("2026-06-20 14:30", now=now)
 
@@ -165,15 +164,14 @@ class ApiControlPlaneTests(IsolatedRuntimeMixin, unittest.TestCase):
         import api
 
         api = importlib.reload(api)
-        client = TestClient(api.app)
+        with TestClient(api.app) as client:
+            health = client.get("/health")
+            self.assertEqual(health.status_code, 200)
+            self.assertEqual(health.json()["status"], "ok")
 
-        health = client.get("/health")
-        self.assertEqual(health.status_code, 200)
-        self.assertEqual(health.json()["status"], "ok")
-
-        audit = client.get("/audit/events")
-        self.assertEqual(audit.status_code, 200)
-        self.assertEqual(audit.json(), [])
+            audit = client.get("/audit/events")
+            self.assertEqual(audit.status_code, 200)
+            self.assertEqual(audit.json(), [])
 
     def test_chat_returns_service_error_when_agent_runtime_is_missing(self):
         from fastapi import HTTPException
@@ -184,7 +182,8 @@ class ApiControlPlaneTests(IsolatedRuntimeMixin, unittest.TestCase):
         original_get_agent_app = api.get_agent_app
         api.get_agent_app = lambda: (_ for _ in ()).throw(HTTPException(status_code=503, detail="Agent runtime unavailable"))
         try:
-            response = TestClient(api.app).post("/chat", json={"message": "hello"})
+            with TestClient(api.app) as client:
+                response = client.post("/chat", json={"message": "hello"})
         finally:
             api.get_agent_app = original_get_agent_app
 

@@ -15,7 +15,10 @@ from .database import create_interview_action
 from .security import EMAIL_RE, redact_pii, stable_hash
 
 
-LOCAL_TZ = ZoneInfo("Asia/Shanghai")
+try:
+    LOCAL_TZ = ZoneInfo("Asia/Shanghai")
+except Exception:
+    LOCAL_TZ = timezone(timedelta(hours=8), name="Asia/Shanghai")
 CN_NUMBERS = {
     "零": 0,
     "一": 1,
