@@ -1,8 +1,20 @@
 # PeopleOps Agent Platform
 
-PeopleOps Agent Platform is an AI-native HRBP workbench for policy Q&A, resume/JD matching, candidate follow-up actions, approvals, audit evidence, and local ATS-style records. It is designed as a practical reference project rather than a single-purpose RAG demo.
+PeopleOps Agent Platform is an AI-native HRBP workbench for policy Q&A, resume/JD matching, candidate follow-up actions, approvals, audit evidence, and local ATS-style records. It is designed as a practical enterprise-console reference project rather than a single-purpose RAG demo.
 
-The Streamlit workbench follows an Enterprise Console design system: cool gray-blue workspace background, white operational panels, fine borders, compact metrics, status-color edge accents, dense evidence rows, and a closed-loop workflow:
+## Reading Guide
+
+Start here if you are reviewing the project for the first time:
+
+1. **Product Snapshot**: what the app does and what the UI looks like.
+2. **Quick Start**: how to run the Streamlit workbench locally.
+3. **Closed-Loop Experience**: how the operator flow works end to end.
+4. **Core Capabilities**: which agent, RAG, governance, and persistence pieces are included.
+5. **Architecture, API, and Configuration**: implementation and deployment details.
+
+## Product Snapshot
+
+The Streamlit workbench uses an Enterprise Console design system: a cool gray-blue workspace background, white operational panels, fine borders, compact metrics, status-color edge accents, dense evidence rows, and an auditable closed-loop workflow.
 
 ```text
 Assemble context -> Agent judgment -> Execute action -> Governance evidence
@@ -12,7 +24,21 @@ Assemble context -> Agent judgment -> Execute action -> Governance evidence
 
 ![Full-page PeopleOps governance evidence console](docs/screenshots/peopleops-enterprise-console-governance.png)
 
-## Product Experience
+## Quick Start
+
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+python -m streamlit run app.py
+```
+
+Open `http://localhost:8501`.
+
+On Windows, if dependency installation fails while unpacking `torch` because the repository path is too deep, use the short-path setup in [`docs/clean-install-and-test.md`](docs/clean-install-and-test.md).
+
+## Closed-Loop Experience
 
 The app is organized around the daily flow of an HR operator.
 
@@ -21,7 +47,7 @@ The app is organized around the daily flow of an HR operator.
 - **Execute action**: create local candidate follow-up actions, email drafts, calendar artifacts, approval requests, and ATS sync payloads.
 - **Governance evidence**: review recent actions, pending approvals, audit events, connector readiness, and audit-chain integrity.
 
-The UI uses a restrained enterprise palette with enough contrast to avoid a flat white canvas: a cool gray-blue app surface, lightly tinted top panel, compact status pills, aligned workflow cards, a closed-loop rail, operational metrics, and ledger-style evidence rows. The committed screenshots are full-page captures so the README shows the complete workbench and governance surfaces rather than cropped viewports.
+The UI intentionally keeps a restrained enterprise palette while avoiding a flat white canvas: a lightly tinted top panel, compact status pills, aligned workflow cards, a closed-loop rail, operational metrics, and ledger-style evidence rows. The committed screenshots are full-page captures so the README shows the complete workbench and governance surfaces rather than cropped viewports.
 
 ## Core Capabilities
 
@@ -55,40 +81,13 @@ Engineering services
   `-- calendar ICS artifacts
 ```
 
-## Project Map
-
-| Path | Purpose |
-| --- | --- |
-| `app.py` | Streamlit workbench and Enterprise Console closed-loop UI. |
-| `api.py` | FastAPI control plane for chat, identity, readiness, action records, approvals, connectors, and audit data. |
-| `core/` | Agent workflow, RAG, matcher, security, audit, tenancy, database, connectors, and tool execution modules. |
-| `data/` | Sample HR policy, resume, and JD documents used by the demo. |
-| `docs/` | Deployment notes, clean-install notes, AI coding workflow notes, and product screenshots. |
-| `evals/` | RAG evaluation dataset. |
-| `scripts/` | Utility scripts for password hashing and RAG evaluation. |
-| `tests/` | Unit tests for core behavior, API control plane, security, tenancy, and evaluation helpers. |
-
-## Quick Start
-
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-Copy-Item .env.example .env
-python -m streamlit run app.py
-```
-
-Open `http://localhost:8501`.
-
-On Windows, if dependency installation fails while unpacking `torch` because the repository path is too deep, use the short-path setup in [`docs/clean-install-and-test.md`](docs/clean-install-and-test.md).
-
 ## API Backend
 
 ```powershell
 python -m uvicorn api:app --host 0.0.0.0 --port 8000
 ```
 
-Endpoints:
+Useful endpoints:
 
 - `GET /health`
 - `GET /readiness`
@@ -103,6 +102,19 @@ Endpoints:
 When `ACCESS_PASSWORD` is configured, pass `X-Access-Password`.
 For multi-tenant API calls, pass `X-Tenant-ID`, `X-Org-ID`, and `X-Department-ID`; local defaults are used when these headers are absent.
 When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations until `ACCESS_PASSWORD` is configured.
+
+## Project Map
+
+| Path | Purpose |
+| --- | --- |
+| `app.py` | Streamlit workbench and Enterprise Console closed-loop UI. |
+| `api.py` | FastAPI control plane for chat, identity, readiness, action records, approvals, connectors, and audit data. |
+| `core/` | Agent workflow, RAG, matcher, security, audit, tenancy, database, connectors, and tool execution modules. |
+| `data/` | Sample HR policy, resume, and JD documents used by the demo. |
+| `docs/` | Deployment notes, clean-install notes, AI coding workflow notes, and product screenshots. |
+| `evals/` | RAG evaluation dataset. |
+| `scripts/` | Utility scripts for password hashing and RAG evaluation. |
+| `tests/` | Unit tests for core behavior, API control plane, security, tenancy, and evaluation helpers. |
 
 ## Configuration
 
