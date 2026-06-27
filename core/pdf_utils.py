@@ -4,14 +4,17 @@ from typing import BinaryIO, Union
 from xml.etree import ElementTree
 from zipfile import ZipFile
 
-from pypdf import PdfReader
-
 
 PdfInput = Union[bytes, BinaryIO]
 
 
 def extract_pdf_text(file: PdfInput) -> str:
     """Extract text from a PDF file-like object or bytes."""
+    try:
+        from pypdf import PdfReader
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("PDF parsing requires the pypdf package. Install requirements.txt before importing PDF resumes.") from exc
+
     source = BytesIO(file) if isinstance(file, bytes) else file
     reader = PdfReader(source)
     pages = []

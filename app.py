@@ -1,4 +1,5 @@
 import time
+from html import escape
 from uuid import uuid4
 
 import streamlit as st
@@ -154,6 +155,103 @@ st.markdown(
         color: var(--po-muted);
         font-size: 13px;
     }
+    .po-loop-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+        margin: 14px 0 8px;
+    }
+    .po-step {
+        min-height: 128px;
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-radius);
+        background: rgba(255,255,255,0.91);
+        padding: 14px;
+        box-shadow: 0 8px 20px rgba(33, 43, 36, 0.045);
+    }
+    .po-step-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 11px;
+    }
+    .po-step-index {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        background: #eef5ff;
+        color: var(--po-blue);
+        font-size: 12px;
+        font-weight: 820;
+    }
+    .po-step-state {
+        font-size: 11px;
+        font-weight: 820;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+    .po-step-state.green { color: var(--po-green); }
+    .po-step-state.amber { color: var(--po-amber); }
+    .po-step-state.blue { color: var(--po-blue); }
+    .po-step-title {
+        margin: 0 0 7px;
+        color: var(--po-ink);
+        font-size: 15px;
+        font-weight: 820;
+    }
+    .po-step-copy {
+        margin: 0;
+        color: var(--po-muted);
+        font-size: 13px;
+        line-height: 1.45;
+    }
+    .po-next-action {
+        margin: 10px 0 18px;
+        border-left: 4px solid var(--po-green);
+        border-radius: var(--po-radius);
+        background: rgba(237,248,241,0.88);
+        padding: 13px 15px;
+    }
+    .po-next-action strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--po-ink);
+        font-size: 14px;
+    }
+    .po-next-action span {
+        color: var(--po-muted);
+        font-size: 13px;
+    }
+    .po-evidence-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin: 8px 0 14px;
+    }
+    .po-evidence-item {
+        border: 1px solid var(--po-line);
+        border-radius: var(--po-radius);
+        background: rgba(255,255,255,0.9);
+        padding: 14px;
+    }
+    .po-evidence-value {
+        color: var(--po-ink);
+        font-size: 24px;
+        line-height: 1;
+        font-weight: 840;
+    }
+    .po-evidence-label {
+        margin-top: 6px;
+        color: var(--po-muted);
+        font-size: 12px;
+        font-weight: 760;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
     .po-ledger-row {
         display: grid;
         grid-template-columns: 72px minmax(0, 1fr);
@@ -197,6 +295,10 @@ st.markdown(
         .po-status-stack {
             width: 100%;
             grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .po-loop-grid,
+        .po-evidence-grid {
+            grid-template-columns: 1fr;
         }
     }
     </style>
@@ -258,7 +360,104 @@ def render_stream(text: str) -> None:
 
 
 def pill(label: str, tone: str = "blue") -> str:
-    return f'<span class="po-pill {tone}">{label}</span>'
+    return f'<span class="po-pill {tone}">{escape(label)}</span>'
+
+
+def render_step(index: int, title: str, copy: str, state: str, tone: str) -> str:
+    return f"""
+    <div class="po-step">
+      <div class="po-step-top">
+        <span class="po-step-index">{index}</span>
+        <span class="po-step-state {tone}">{escape(state)}</span>
+      </div>
+      <h3 class="po-step-title">{escape(title)}</h3>
+      <p class="po-step-copy">{escape(copy)}</p>
+    </div>
+    """
+
+
+def workflow_snapshot(jd_input: str) -> dict:
+    resume_count = len(st.session_state["resume_file_names"])
+    has_resume = bool(st.session_state["extracted_resume_text"])
+    has_jd = bool(jd_input.strip())
+    interviews = list_interview_actions(limit=100)
+    approvals = list_approval_requests(limit=100)
+    events = read_audit_events(limit=100)
+    pending_approvals = [item for item in approvals if item["status"] == "PENDING"]
+    integrity = verify_audit_integrity()
+
+    if not has_resume and not has_jd:
+        next_action = "先在左侧导入候选人简历并粘贴 JD，形成可评估的上下文。"
+    elif not has_resume:
+        next_action = "JD 已就绪；继续导入简历后即可让 Agent 输出匹配报告。"
+    elif not has_jd:
+        next_action = "简历已就绪；补充 JD 后可获得更可信的匹配评分。"
+    elif not interviews:
+        next_action = "材料已齐；在下方对话中要求 Agent 做候选人匹配或安排面试。"
+    elif pending_approvals:
+        next_action = "已有待审动作；切到治理证据页查看审批队列和审计链。"
+    else:
+        next_action = "闭环已形成；可在治理证据页复核动作、产物和审计记录。"
+
+    steps = [
+        {
+            "title": "输入材料",
+            "copy": f"{resume_count} 份简历，JD {'已填写' if has_jd else '待填写'}。",
+            "state": "Ready" if has_resume and has_jd else "Needs Input",
+            "tone": "green" if has_resume and has_jd else "amber",
+        },
+        {
+            "title": "Agent 判断",
+            "copy": "自动路由到政策问答、简历匹配或行政动作工具。",
+            "state": "Online" if settings.has_llm_config else "Degraded",
+            "tone": "green" if settings.has_llm_config else "amber",
+        },
+        {
+            "title": "执行动作",
+            "copy": f"{len(interviews)} 条面试动作，{len(pending_approvals)} 条待审请求。",
+            "state": "Active" if interviews or pending_approvals else "Waiting",
+            "tone": "green" if interviews else "blue",
+        },
+        {
+            "title": "证据回流",
+            "copy": f"{len(events)} 条审计事件，审计链 {'有效' if integrity.get('valid') else '待复核'}。",
+            "state": "Valid" if integrity.get("valid") else "Review",
+            "tone": "green" if integrity.get("valid") else "amber",
+        },
+    ]
+    return {
+        "steps": steps,
+        "next_action": next_action,
+        "interviews": interviews,
+        "approvals": approvals,
+        "pending_approvals": pending_approvals,
+        "events": events,
+        "integrity": integrity,
+    }
+
+
+def render_workflow_loop(jd_input: str) -> dict:
+    snapshot = workflow_snapshot(jd_input)
+    st.markdown('<div class="po-section">Closed Loop</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="po-loop-grid">'
+        + "".join(
+            render_step(idx, step["title"], step["copy"], step["state"], step["tone"])
+            for idx, step in enumerate(snapshot["steps"], start=1)
+        )
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"""
+        <div class="po-next-action">
+          <strong>下一步建议</strong>
+          <span>{escape(snapshot["next_action"])}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    return snapshot
 
 
 def render_topline() -> None:
@@ -314,7 +513,7 @@ def require_access() -> None:
 
 def render_sidebar() -> str:
     with st.sidebar:
-        st.markdown('<div class="po-section">Candidate Inputs</div>', unsafe_allow_html=True)
+        st.markdown('<div class="po-section">1. Assemble Context</div>', unsafe_allow_html=True)
         uploaded_resumes = st.file_uploader(
             "导入简历文件",
             type=["pdf", "docx", "txt", "md"],
@@ -374,7 +573,7 @@ def render_sidebar() -> str:
             with st.expander("简历文本预览", expanded=False):
                 st.text(st.session_state["extracted_resume_text"][:3000])
 
-        st.markdown('<div class="po-section">Retrieval Preview</div>', unsafe_allow_html=True)
+        st.markdown('<div class="po-section">2. Preview Evidence</div>', unsafe_allow_html=True)
         preview_question = st.text_input("检索问题", placeholder="例如：出差报销有什么标准？")
         if st.button("预览引用", use_container_width=True) and preview_question.strip():
             evidence = get_policy_evidence(preview_question.strip())
@@ -385,7 +584,7 @@ def render_sidebar() -> str:
             else:
                 st.warning("未检索到引用片段。")
 
-        st.markdown('<div class="po-section">Runtime Signals</div>', unsafe_allow_html=True)
+        st.markdown('<div class="po-section">3. Runtime Signals</div>', unsafe_allow_html=True)
         if not settings.policy_pdf_path.exists():
             st.warning("未找到企业知识库 PDF，请检查 HR_POLICY_PDF 配置。")
         if not settings.has_llm_config:
@@ -431,18 +630,70 @@ def render_metrics() -> None:
     )
 
 
-def render_activity_panel() -> None:
+def render_governance_summary(snapshot: dict) -> None:
+    connectors = connector_inventory()
+    configured_connectors = [item for item in connectors if item["status"] == "configured"]
+    integrity = snapshot["integrity"]
+    st.markdown('<div class="po-section">Evidence Summary</div>', unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div class="po-evidence-grid">
+          <div class="po-evidence-item">
+            <div class="po-evidence-value">{len(snapshot["interviews"])}</div>
+            <div class="po-evidence-label">Interview Actions</div>
+          </div>
+          <div class="po-evidence-item">
+            <div class="po-evidence-value">{len(snapshot["pending_approvals"])}</div>
+            <div class="po-evidence-label">Pending Approvals</div>
+          </div>
+          <div class="po-evidence-item">
+            <div class="po-evidence-value">{integrity.get("total_events", len(snapshot["events"]))}</div>
+            <div class="po-evidence-label">Audit Events</div>
+          </div>
+        </div>
+        <div class="po-panel">
+          <div class="po-panel-title">Closure status</div>
+          <p class="po-panel-copy">
+            Audit chain: {"valid" if integrity.get("valid") else "needs review"} ·
+            Connectors configured: {len(configured_connectors)}/{len(connectors)} ·
+            Tool mode: {settings.tool_execution_mode}
+          </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_connector_panel() -> None:
+    st.markdown('<div class="po-section">Connector Readiness</div>', unsafe_allow_html=True)
+    connectors = connector_inventory()
+    for connector in connectors[:6]:
+        missing = connector.get("missing_env") or []
+        detail = "configured" if connector["status"] == "configured" else f"missing {len(missing)} env vars"
+        st.markdown(
+            f"""
+            <div class="po-ledger-row">
+              <div class="po-ledger-key">{escape(str(connector["category"]))}</div>
+              <div class="po-ledger-value">{escape(str(connector["name"]))} · {escape(str(connector["capability"]))} · {escape(detail)}</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def render_activity_panel(snapshot: dict) -> None:
+    render_governance_summary(snapshot)
     action_col, approval_col, audit_col = st.columns(3)
     with action_col:
         st.markdown('<div class="po-section">Recent Actions</div>', unsafe_allow_html=True)
-        actions = list_interview_actions(limit=5)
+        actions = snapshot["interviews"][:5]
         if actions:
             for action in actions:
                 st.markdown(
                     f"""
                     <div class="po-ledger-row">
-                      <div class="po-ledger-key">#{action['id']}</div>
-                      <div class="po-ledger-value">{action['status']} · {action['candidate_name']} · {action['interview_time']}</div>
+                      <div class="po-ledger-key">#{escape(str(action['id']))}</div>
+                      <div class="po-ledger-value">{escape(str(action['status']))} · {escape(str(action['candidate_name']))} · {escape(str(action['interview_time']))}</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -452,14 +703,14 @@ def render_activity_panel() -> None:
 
     with approval_col:
         st.markdown('<div class="po-section">Approval Queue</div>', unsafe_allow_html=True)
-        approvals = list_approval_requests(limit=5)
+        approvals = snapshot["approvals"][:5]
         if approvals:
             for approval in approvals:
                 st.markdown(
                     f"""
                     <div class="po-ledger-row">
-                      <div class="po-ledger-key">#{approval['id']}</div>
-                      <div class="po-ledger-value">{approval['status']} · {approval['action_type']} · {approval['subject_ref']}</div>
+                      <div class="po-ledger-key">#{escape(str(approval['id']))}</div>
+                      <div class="po-ledger-value">{escape(str(approval['status']))} · {escape(str(approval['action_type']))} · {escape(str(approval['subject_ref']))}</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
@@ -469,24 +720,36 @@ def render_activity_panel() -> None:
 
     with audit_col:
         st.markdown('<div class="po-section">Audit Trail</div>', unsafe_allow_html=True)
-        events = read_audit_events(limit=5)
+        events = snapshot["events"][-5:]
         if events:
             for event in reversed(events):
                 st.markdown(
                     f"""
                     <div class="po-ledger-row">
-                      <div class="po-ledger-key">{event.get('event_type', 'event')}</div>
-                      <div class="po-ledger-value">{event.get('timestamp', '')[:19]} · {event.get('actor') or 'local'}</div>
+                      <div class="po-ledger-key">{escape(str(event.get('event_type', 'event')))}</div>
+                      <div class="po-ledger-value">{escape(str(event.get('timestamp', '')[:19]))} · {escape(str(event.get('actor') or 'local'))}</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
         else:
             st.markdown('<div class="po-empty">暂无审计事件。</div>', unsafe_allow_html=True)
+    render_connector_panel()
 
 
 def render_chat(jd_input: str) -> None:
     st.markdown('<div class="po-section">Agent Workspace</div>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <div class="po-panel">
+          <div class="po-panel-title">从判断到留痕</div>
+          <p class="po-panel-copy">
+            在这里发起政策问答、候选人匹配或面试安排。Agent 的用户输入、输出、工具动作和审批结果会回流到治理证据页。
+          </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
@@ -539,9 +802,10 @@ require_access()
 render_topline()
 jd_text = render_sidebar()
 render_metrics()
+workflow_state = render_workflow_loop(jd_text)
 
 tabs = st.tabs(["Agent Console", "Governance Evidence"])
 with tabs[0]:
     render_chat(jd_text)
 with tabs[1]:
-    render_activity_panel()
+    render_activity_panel(workflow_state)
