@@ -66,12 +66,13 @@ import {
 } from "../lib/api";
 
 type ProductView = "workspace" | "candidates" | "approvals" | "connectors" | "audit" | "settings";
+type InspectorView = "overview" | "trace" | "actions" | "audit";
 
 const starterMessages: ChatMessage[] = [
   {
     role: "assistant",
     content:
-      "Hello, I am the PeopleOps Intelligence Assistant. Upload a resume, paste a JD, or ask about policy, reimbursement, attendance, benefits, and candidate follow-up actions.",
+      "你好，我是 PeopleOps 智能助手。你可以上传简历、粘贴 JD，或直接询问制度、报销、考勤、福利和候选人跟进动作。",
   },
 ];
 
@@ -80,14 +81,14 @@ function statusTone(ok?: boolean) {
 }
 
 function readinessLabel(ok?: boolean) {
-  return ok ? "Production ready" : "Needs review";
+  return ok ? "生产就绪" : "待复核";
 }
 
 function auditLabel(ok?: boolean) {
-  return ok ? "Audit valid" : "Needs check";
+  return ok ? "审计有效" : "待检查";
 }
 
-function shortText(value: string | undefined, fallback = "None") {
+function shortText(value: string | undefined, fallback = "暂无") {
   if (!value) return fallback;
   return value.length > 72 ? `${value.slice(0, 72)}...` : value;
 }
@@ -106,7 +107,7 @@ function parseJsonSafe(value?: string) {
   }
 }
 
-function previewJson(value: unknown, fallback = "No details") {
+function previewJson(value: unknown, fallback = "暂无详情") {
   if (value === null || value === undefined || value === "") return fallback;
   const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
   return text.length > 520 ? `${text.slice(0, 520)}...` : text;
@@ -158,10 +159,10 @@ function inferPageLabel(source: string) {
 
 function evidenceReliability(item: RagEvidence, question: string) {
   const hits = keywordHits(question, item.snippet);
-  if (!item.snippet) return "No excerpt";
-  if (hits.length >= 2) return "Keyword hit";
-  if (item.source) return "Traceable";
-  return "Needs review";
+  if (!item.snippet) return "无片段";
+  if (hits.length >= 2) return "关键词命中";
+  if (item.source) return "可追溯";
+  return "待复核";
 }
 
 function statusClass(status?: string) {
@@ -175,18 +176,18 @@ function statusClass(status?: string) {
 function statusLabel(status?: string) {
   const normalized = (status || "").toUpperCase();
   const labels: Record<string, string> = {
-    APPROVED: "Approved",
-    CANCELLED: "Cancelled",
-    COMPLETED: "Completed",
-    CONFIGURED: "Configured",
-    ERROR: "Error",
-    FAILED: "Failed",
-    PENDING: "Pending review",
-    READY: "Ready",
-    REJECTED: "Rejected",
-    RUNNING: "Running",
-    SUCCESS: "Success",
-    SUCCEEDED: "Success",
+    APPROVED: "已通过",
+    CANCELLED: "已取消",
+    COMPLETED: "已完成",
+    CONFIGURED: "已配置",
+    ERROR: "错误",
+    FAILED: "失败",
+    PENDING: "待审批",
+    READY: "就绪",
+    REJECTED: "已拒绝",
+    RUNNING: "运行中",
+    SUCCESS: "成功",
+    SUCCEEDED: "成功",
   };
   return labels[normalized] || status || "--";
 }
@@ -194,11 +195,27 @@ function statusLabel(status?: string) {
 function eventSummary(event: TaskEvent) {
   const payload = event.payload || {};
   const keys = Object.keys(payload);
-  if (!keys.length) return "鏃?payload";
+  if (!keys.length) return "无 payload";
   const preferred = ["intent", "tool_name", "status", "evidence_count", "reply_chars", "error"];
   const picked = preferred.filter((key) => key in payload);
   const displayKeys = picked.length ? picked : keys.slice(0, 3);
-  return displayKeys.map((key) => `${key}: ${String(payload[key]).slice(0, 48)}`).join(" 路 ");
+  return displayKeys.map((key) => `${key}: ${String(payload[key]).slice(0, 48)}`).join(" · ");
+}
+
+function getInitialProductView(): ProductView {
+  if (typeof window === "undefined") return "workspace";
+  const view = new URLSearchParams(window.location.search).get("view");
+  return ["workspace", "candidates", "approvals", "connectors", "audit", "settings"].includes(view || "")
+    ? (view as ProductView)
+    : "workspace";
+}
+
+function getInitialInspectorView(): InspectorView {
+  if (typeof window === "undefined") return "overview";
+  const inspector = new URLSearchParams(window.location.search).get("inspector");
+  return ["overview", "trace", "actions", "audit"].includes(inspector || "")
+    ? (inspector as InspectorView)
+    : "overview";
 }
 
 function EmptyState({
@@ -246,12 +263,12 @@ export default function Home() {
   const [toolExecutions, setToolExecutions] = useState<ToolExecutionRecord[]>([]);
   const [connectors, setConnectors] = useState<ConnectorRecord[]>([]);
   const [error, setError] = useState("");
-  const [activeInspector, setActiveInspector] = useState<"overview" | "trace" | "actions" | "audit">("overview");
+  const [activeInspector, setActiveInspector] = useState<InspectorView>(() => getInitialInspectorView());
   const [selectedToolExecutionId, setSelectedToolExecutionId] = useState<number | null>(null);
   const [isRefreshingOps, setIsRefreshingOps] = useState(false);
   const [loadingTaskId, setLoadingTaskId] = useState("");
   const [pendingApprovalId, setPendingApprovalId] = useState<number | null>(null);
-  const [activeProductView, setActiveProductView] = useState<ProductView>("workspace");
+  const [activeProductView, setActiveProductView] = useState<ProductView>(() => getInitialProductView());
   const [productionChecks, setProductionChecks] = useState<ProductionChecksResponse | null>(null);
 
   const latestUserQuestion = useMemo(
@@ -280,7 +297,7 @@ export default function Home() {
       setHealth(healthData);
       setReadiness(readinessData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to read backend status");
+      setError(err instanceof Error ? err.message : "无法读取后端状态");
     }
 
     try {
@@ -336,11 +353,11 @@ export default function Home() {
     try {
       for (const file of files) {
         const extracted = await extractDocument(file, accessPassword);
-        textParts.push(`銆?{extracted.filename}銆慭n${extracted.text}`);
+        textParts.push(`《${extracted.filename}》\n${extracted.text}`);
       }
       setResumeText(textParts.join("\n\n"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "鏂囨。瑙ｆ瀽澶辫触");
+      setError(err instanceof Error ? err.message : "文档解析失败");
     } finally {
       setIsExtracting(false);
     }
@@ -372,7 +389,7 @@ export default function Home() {
         ...current,
         {
           role: "assistant",
-          content: response.reply || "The system did not return a valid response.",
+          content: response.reply || "系统没有返回有效回复。",
           evidence: response.evidence || [],
         },
       ]);
@@ -380,12 +397,12 @@ export default function Home() {
       const task = await getTaskDetail(response.task_id, accessPassword);
       setSelectedTask(task);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Agent 璇锋眰澶辫触");
+      setError(err instanceof Error ? err.message : "Agent 请求失败");
       setMessages((current) => [
         ...current,
         {
           role: "assistant",
-          content: "The request did not complete. Check the backend API, access password, or model configuration.",
+          content: "请求没有完成。请检查后端 API、访问口令或模型配置。",
         },
       ]);
     } finally {
@@ -400,7 +417,7 @@ export default function Home() {
       await transitionApproval(approvalId, action, accessPassword);
       await refreshOperationalData(accessPassword);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Approval status update failed");
+      setError(err instanceof Error ? err.message : "审批状态更新失败");
     } finally {
       setPendingApprovalId(null);
     }
@@ -412,7 +429,7 @@ export default function Home() {
     try {
       setSelectedTask(await getTaskDetail(taskId, accessPassword));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "浠诲姟璇︽儏璇诲彇澶辫触");
+      setError(err instanceof Error ? err.message : "任务详情读取失败");
     } finally {
       setLoadingTaskId("");
     }
@@ -427,52 +444,52 @@ export default function Home() {
     : health?.oidc_enabled
       ? "OIDC"
       : health?.access_password_required
-        ? "Password"
-        : "Local";
+        ? "口令"
+        : "本地";
   const deploymentChecks = [
-    { label: "Model", ok: Boolean(health?.model_configured), value: health?.chat_model || "--" },
-    { label: "Identity", ok: Boolean(health), value: identityMode },
-    { label: "Database", ok: health?.database_backend === "sqlite" || Boolean(health?.database_url_configured), value: health?.database_backend || "--" },
-    { label: "Vector search", ok: health?.vector_backend === "chroma" || Boolean(health?.vector_store_url_configured), value: health?.vector_backend || "--" },
-    { label: "Object store", ok: Boolean(health?.object_storage_configured) || !readiness?.enterprise_warnings?.some((item) => item.includes("OBJECT_STORAGE_URI")), value: health?.object_storage_configured ? "configured" : "local" },
-    { label: "Audit chain", ok: Boolean(auditValid), value: auditValid ? "valid" : "check" },
+    { label: "模型配置", ok: Boolean(health?.model_configured), value: health?.chat_model || "--" },
+    { label: "身份模式", ok: Boolean(health), value: identityMode },
+    { label: "数据库", ok: health?.database_backend === "sqlite" || Boolean(health?.database_url_configured), value: health?.database_backend || "--" },
+    { label: "向量检索", ok: health?.vector_backend === "chroma" || Boolean(health?.vector_store_url_configured), value: health?.vector_backend || "--" },
+    { label: "对象存储", ok: Boolean(health?.object_storage_configured) || !readiness?.enterprise_warnings?.some((item) => item.includes("OBJECT_STORAGE_URI")), value: health?.object_storage_configured ? "已配置" : "本地" },
+    { label: "审计链", ok: Boolean(auditValid), value: auditValid ? "有效" : "检查" },
   ];
-  const materialStatus = resumeFiles.length ? `${resumeFiles.length} files` : resumeText.trim() ? "Resume pasted" : "Add material";
-  const jdStatus = jdText.trim() ? "Role ready" : "Add job context";
+  const materialStatus = resumeFiles.length ? `${resumeFiles.length} 个文件` : resumeText.trim() ? "已粘贴简历" : "补充材料";
+  const jdStatus = jdText.trim() ? "岗位已就绪" : "补充岗位";
   const inspectorTabs = [
-    { id: "overview" as const, label: "Overview", icon: ShieldCheck },
-    { id: "trace" as const, label: "Trace", icon: GitBranch },
-    { id: "actions" as const, label: "Actions", icon: Wrench },
-    { id: "audit" as const, label: "Audit", icon: Database },
+    { id: "overview" as const, label: "概览", icon: ShieldCheck },
+    { id: "trace" as const, label: "追溯", icon: GitBranch },
+    { id: "actions" as const, label: "动作", icon: Wrench },
+    { id: "audit" as const, label: "审计", icon: Database },
   ];
   const quickPrompts = [
-    "How well does this resume match the JD?",
-    "What is the travel reimbursement policy?",
-    "Generate interview follow-up actions for this candidate.",
+    "这份简历和 JD 的匹配度如何？",
+    "差旅住宿报销标准是什么？",
+    "生成候选人面试跟进动作。",
   ];
   const overviewSignals = [
-    { label: "Material", value: materialStatus, tone: resumeText.trim() || resumeFiles.length ? "ok" : "warn" },
-    { label: "Role", value: jdStatus, tone: jdText.trim() ? "ok" : "warn" },
-    { label: "Approvals", value: approvals.filter((item) => item.status === "PENDING").length.toString(), tone: approvals.some((item) => item.status === "PENDING") ? "warn" : "ok" },
-    { label: "Audit", value: auditLabel(auditValid), tone: auditValid ? "ok" : "warn" },
+    { label: "材料", value: materialStatus, tone: resumeText.trim() || resumeFiles.length ? "ok" : "warn" },
+    { label: "岗位", value: jdStatus, tone: jdText.trim() ? "ok" : "warn" },
+    { label: "审批", value: approvals.filter((item) => item.status === "PENDING").length.toString(), tone: approvals.some((item) => item.status === "PENDING") ? "warn" : "ok" },
+    { label: "审计", value: auditLabel(auditValid), tone: auditValid ? "ok" : "warn" },
   ];
   const workflowSteps = [
     {
       label: "1",
-      title: "Prepare material",
+      title: "准备材料",
       body: materialStatus,
       ok: Boolean(resumeText.trim() || resumeFiles.length),
     },
     {
       label: "2",
-      title: "Add role context",
+      title: "补充岗位",
       body: jdStatus,
       ok: Boolean(jdText.trim()),
     },
     {
       label: "3",
-      title: "Generate judgment and actions",
-      body: lastTaskId ? "Task replay available" : "Send a question to ground evidence",
+      title: "生成判断与动作",
+      body: lastTaskId ? "已有任务回放" : "发送问题后沉淀证据",
       ok: Boolean(lastTaskId),
     },
   ];
@@ -482,101 +499,101 @@ export default function Home() {
   const hasApiIssue = Boolean(error);
   const hasAuthGate = Boolean(health?.access_password_required && !accessPassword);
   const healthBanner = hasApiIssue
-    ? { tone: "danger", title: "Backend connection issue", body: error }
+    ? { tone: "danger", title: "后端连接异常", body: error }
     : hasAuthGate
-      ? { tone: "warn", title: "Access password required", body: "Enter the access password to load approvals, audit events, connectors, and tool execution records." }
+      ? { tone: "warn", title: "需要访问口令", body: "输入访问口令后才能加载审批、审计事件、连接器和工具执行记录。" }
       : !ready
-        ? { tone: "warn", title: "Production readiness needs review", body: readinessWarnings[0] || "This environment still has configuration items to confirm." }
+        ? { tone: "warn", title: "生产就绪度待复核", body: readinessWarnings[0] || "当前环境仍有配置项需要确认。" }
         : null;
   const candidateRecords = [
     {
-      name: resumeFiles[0]?.replace(/\.[^.]+$/, "") || (resumeText.trim() ? "Current candidate" : "Candidate pending import"),
-      role: jdText.trim() ? "Linked to current JD" : "Role pending",
-      stage: lastTaskId ? "Analyzed" : resumeText.trim() || resumeFiles.length ? "Ready to analyze" : "Pending import",
-      fit: lastTaskId ? "Recommendation generated" : jdText.trim() && (resumeText.trim() || resumeFiles.length) ? "Ready to match" : "Incomplete material",
+      name: resumeFiles[0]?.replace(/\.[^.]+$/, "") || (resumeText.trim() ? "当前候选人" : "待导入候选人"),
+      role: jdText.trim() ? "已关联当前 JD" : "待关联岗位",
+      stage: lastTaskId ? "已分析" : resumeText.trim() || resumeFiles.length ? "待分析" : "待导入",
+      fit: lastTaskId ? "已生成建议" : jdText.trim() && (resumeText.trim() || resumeFiles.length) ? "可开始匹配" : "资料不完整",
     },
     {
-      name: "Sales operations manager pool",
-      role: "Sample queue",
-      stage: "Pending import",
-      fit: "Sync after ATS connection",
+      name: "销售运营经理候选池",
+      role: "示例队列",
+      stage: "待导入",
+      fit: "连接 ATS 后同步",
     },
     {
-      name: "Engineering productivity pool",
-      role: "Sample queue",
-      stage: "Pending import",
-      fit: "Sync after ATS connection",
+      name: "研发效能候选池",
+      role: "示例队列",
+      stage: "待导入",
+      fit: "连接 ATS 后同步",
     },
   ];
   const navigationItems = [
-    { id: "workspace" as const, label: "Workspace", value: "Agent console", icon: Layers3 },
-    { id: "candidates" as const, label: "Candidates", value: `${resumeFiles.length || (resumeText.trim() ? 1 : 0)} materials`, icon: Users },
-    { id: "approvals" as const, label: "Approvals", value: `${pendingApprovals.length} pending`, icon: ClipboardList },
-    { id: "connectors" as const, label: "Connectors", value: connectorSummary(connectors), icon: Plug },
-    { id: "audit" as const, label: "Audit", value: auditLabel(auditValid), icon: ShieldCheck },
-    { id: "settings" as const, label: "Settings", value: "Config center", icon: Settings },
+    { id: "workspace" as const, label: "工作台", value: "Agent 中枢", icon: Layers3 },
+    { id: "candidates" as const, label: "候选人", value: `${resumeFiles.length || (resumeText.trim() ? 1 : 0)} 份材料`, icon: Users },
+    { id: "approvals" as const, label: "审批", value: `${pendingApprovals.length} 待处理`, icon: ClipboardList },
+    { id: "connectors" as const, label: "连接器", value: connectorSummary(connectors), icon: Plug },
+    { id: "audit" as const, label: "审计", value: auditLabel(auditValid), icon: ShieldCheck },
+    { id: "settings" as const, label: "设置", value: "配置中心", icon: Settings },
   ];
   const usageItems = [
-    { label: "Tasks", value: operations?.task_count ?? tasks.length },
-    { label: "Tool calls", value: operations?.tool_execution_count ?? toolExecutions.length },
-    { label: "Approvals", value: approvals.length },
+    { label: "任务", value: operations?.task_count ?? tasks.length },
+    { label: "工具调用", value: operations?.tool_execution_count ?? toolExecutions.length },
+    { label: "审批", value: approvals.length },
   ];
   const fallbackProductionChecks: ProductionCheckRecord[] = [
     {
       id: "postgresql",
-      label: "PostgreSQL instance, migrations, and read/write verification",
+      label: "PostgreSQL 实例、迁移与读写验证",
       status: health?.database_backend === "postgresql" && health?.database_url_configured ? "configured" : "not_configured",
       verification: "configuration",
-      detail: `${health?.database_backend || "--"} / DATABASE_URL=${health?.database_url_configured ? "configured" : "missing"}`,
-      next_step: "Connect the backend /production/checks endpoint for live verification.",
+      detail: `${health?.database_backend || "--"} / DATABASE_URL=${health?.database_url_configured ? "已配置" : "缺失"}`,
+      next_step: "连接后端 /production/checks 获取实机联调门禁。",
     },
     {
       id: "qdrant",
-      label: "Qdrant or production vector index write/search",
+      label: "Qdrant 或生产向量库写入/检索",
       status: health?.vector_backend !== "chroma" && health?.vector_store_url_configured ? "configured" : "not_configured",
       verification: "configuration",
-      detail: `${health?.vector_backend || "--"} / VECTOR_STORE_URL=${health?.vector_store_url_configured ? "configured" : "missing"}`,
-      next_step: "Configure the production vector store, then run index write, retrieval, and RAG eval checks.",
+      detail: `${health?.vector_backend || "--"} / VECTOR_STORE_URL=${health?.vector_store_url_configured ? "已配置" : "缺失"}`,
+      next_step: "配置生产向量库后执行索引写入、检索和 RAG 评测。",
     },
     {
       id: "object_storage",
-      label: "S3/MinIO object upload, download, permissions, and lifecycle",
+      label: "S3/MinIO 对象上传、下载、权限与生命周期",
       status: health?.object_storage_configured ? "configured" : "not_configured",
       verification: "configuration",
-      detail: health?.object_storage_configured ? "OBJECT_STORAGE_URI configured" : "OBJECT_STORAGE_URI missing",
-      next_step: "Verify put/get/delete operations and lifecycle policy behavior.",
+      detail: health?.object_storage_configured ? "OBJECT_STORAGE_URI 已配置" : "OBJECT_STORAGE_URI 缺失",
+      next_step: "验证 put/get/delete 操作和生命周期策略。",
     },
     {
       id: "oidc",
-      label: "OIDC provider token validation and role mapping",
+      label: "OIDC 真实 token 校验与角色映射",
       status: health?.oidc_enabled ? "configured" : "not_configured",
       verification: "configuration",
       detail: identityMode,
-      next_step: "Call /me with a real bearer token to verify role mapping.",
+      next_step: "使用真实 bearer token 调用 /me 验证角色映射。",
     },
     {
       id: "external_tools",
-      label: "ATS/calendar API credentials, retries, idempotency, and compensation",
+      label: "ATS/日历 API 凭证、重试、幂等与补偿",
       status: connectors.some((item) => item.status === "configured" && ["ats", "calendar", "collaboration"].includes(item.category)) ? "configured" : "not_configured",
       verification: "configuration",
-      detail: `${connectorSummary(connectors)} connectors configured`,
-      next_step: "Run sandbox ATS stage changes, calendar invites, retry checks, and compensation evidence.",
+      detail: `${connectorSummary(connectors)} 个连接器已配置`,
+      next_step: "执行沙箱 ATS 阶段变更、日历邀请、失败重试和补偿记录验证。",
     },
     {
       id: "network_ops",
-      label: "Production network, TLS, CORS, gateway, logs, and alerts",
+      label: "生产网络、TLS、CORS、网关、日志与告警",
       status: health?.trusted_sso_enabled || health?.oidc_enabled ? "configured" : "not_configured",
       verification: "configuration",
-      detail: `rate limit / identity / gateway readiness`,
-      next_step: "Verify TLS, CORS, access logs, and alert routes at the production gateway.",
+      detail: `限流 / 身份 / 网关就绪度`,
+      next_step: "在生产网关验证 TLS、CORS、访问日志和告警路由。",
     },
     {
       id: "e2e_demo",
-      label: "End-to-end demo and rollback rehearsal",
+      label: "全链路端到端演示与回滚演练",
       status: "configured",
       verification: "runbook",
-      detail: "Runbook exists; requires operator evidence.",
-      next_step: "Run upload, Q&A, approval, execution, audit chain, and rollback rehearsal.",
+      detail: "Runbook 已存在；仍需操作者证据。",
+      next_step: "跑通上传、问答、审批、执行、审计链和回滚演练。",
     },
   ];
   const productionReadinessItems = productionChecks?.checks || fallbackProductionChecks;
@@ -595,22 +612,22 @@ export default function Home() {
           <div className="brand-mark">P</div>
           <div>
             <p className="eyebrow">PeopleOps</p>
-            <h1>Intelligence Console</h1>
+            <h1>智能控制台</h1>
           </div>
         </div>
 
-        <section className="tenant-card" aria-label="Tenant information">
+        <section className="tenant-card" aria-label="租户信息">
           <div className="tenant-mark">
             <Building2 size={17} />
           </div>
           <div>
-            <span>Current tenant</span>
+            <span>当前租户</span>
             <strong>{tenantName}</strong>
           </div>
           <em>Pro</em>
         </section>
 
-        <nav className="side-nav" aria-label="Product navigation">
+        <nav className="side-nav" aria-label="产品导航">
           {navigationItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -632,26 +649,26 @@ export default function Home() {
         <section className="panel-section">
           <div className="section-title">
             <BriefcaseBusiness size={16} />
-            Candidate and role context
+            候选人与岗位上下文
           </div>
           <label className="file-drop">
             <Upload size={18} />
-            <span>{isExtracting ? "Parsing document" : "Upload resume or material"}</span>
+            <span>{isExtracting ? "正在解析文档" : "上传简历或材料"}</span>
             <input multiple type="file" accept=".pdf,.docx,.txt,.md,.markdown" onChange={handleFiles} />
           </label>
           <div className="file-list">
-            {resumeFiles.length ? resumeFiles.map((name) => <span key={name}>{name}</span>) : "Supports PDF, DOCX, TXT, and MD. Uploads are parsed by the backend."}
+            {resumeFiles.length ? resumeFiles.map((name) => <span key={name}>{name}</span>) : "支持 PDF、DOCX、TXT、MD；上传后由后端解析文本。"}
           </div>
           <textarea
             value={resumeText}
             onChange={(event) => setResumeText(event.target.value)}
-            placeholder="Candidate resume, interview notes, or key summaries appear here."
+            placeholder="候选人简历、面试记录或关键摘要会出现在这里。"
             rows={7}
           />
           <textarea
             value={jdText}
             onChange={(event) => setJdText(event.target.value)}
-            placeholder="Paste the job description, capability requirements, and seniority expectations."
+            placeholder="粘贴岗位 JD、能力要求和年限要求。"
             rows={7}
           />
         </section>
@@ -659,26 +676,26 @@ export default function Home() {
         <section className="panel-section compact">
           <div className="section-title">
             <LockKeyhole size={16} />
-            Access and backend
+            访问与后端
           </div>
           <form className="access-form" onSubmit={(event) => event.preventDefault()}>
             <input
-              aria-label="Access password"
+              aria-label="访问口令"
               autoComplete="current-password"
               value={accessPassword}
               onChange={(event) => setAccessPassword(event.target.value)}
               onBlur={(event) => refreshOperationalData(event.currentTarget.value)}
               type="password"
-              placeholder="Access password"
+              placeholder="访问口令"
             />
           </form>
           <p className="subtle">API: {API_BASE}</p>
         </section>
 
-        <section className="usage-card" aria-label="Monthly usage">
+        <section className="usage-card" aria-label="本月用量">
           <div className="section-title">
             <BarChart3 size={16} />
-            Monthly usage
+            本月用量
           </div>
           <div className="usage-grid">
             {usageItems.map((item) => (
@@ -694,23 +711,23 @@ export default function Home() {
       <section className="workspace">
         <header className="workspace-header">
           <div>
-            <p className="eyebrow">HRBP Operations Console</p>
-            <h2>{health?.app_name || "PeopleOps Intelligence Agent"}</h2>
-            <p>AI workbench for multi-tenant PeopleOps teams: policy Q&A, resume matching, candidate follow-up, approvals, and audit traceability.</p>
+            <p className="eyebrow">HRBP 运营控制台</p>
+            <h2>{health?.app_name || "PeopleOps 智能体平台"}</h2>
+            <p>面向多租户 PeopleOps 团队的 AI 工作台：集中处理政策问答、简历匹配、候选人跟进、审批和审计追溯。</p>
           </div>
           <div className="header-ops">
-            <div className="workspace-actions" aria-label="Workspace actions">
-              <button type="button" title="Notifications">
+            <div className="workspace-actions" aria-label="工作区动作">
+              <button type="button" title="通知">
                 <AlertTriangle size={15} />
               </button>
-              <button type="button" title="Settings">
+              <button type="button" title="设置">
                 <Settings size={15} />
               </button>
             </div>
             <div className="status-cluster">
               <span className={statusTone(Boolean(health?.status))}>
                 <CheckCircle2 size={14} />
-                API {health?.status || "checking"}
+                API {health?.status ? statusLabel(health.status) : "检查中"}
               </span>
               <span className={statusTone(ready)}>
                 <ShieldCheck size={14} />
@@ -736,7 +753,7 @@ export default function Home() {
 
         {activeProductView === "workspace" ? (
           <>
-        <section className="overview-strip" aria-label="杩愯惀鎬佸娍">
+        <section className="overview-strip" aria-label="运营态势">
           {overviewSignals.map((item) => (
             <div className={`signal-card ${item.tone}`} key={item.label}>
               <span>{item.label}</span>
@@ -745,7 +762,7 @@ export default function Home() {
           ))}
         </section>
 
-        <section className="workflow-strip" aria-label="First-use workflow">
+        <section className="workflow-strip" aria-label="首次使用流程">
           {workflowSteps.map((step) => (
             <div className={step.ok ? "workflow-step done" : "workflow-step"} key={step.label}>
               <span>{step.label}</span>
@@ -766,17 +783,17 @@ export default function Home() {
 
         <section className="mobile-material-card">
           <div>
-            <p className="eyebrow">Candidate Context</p>
-            <h3>Candidate material</h3>
+            <p className="eyebrow">候选人上下文</p>
+            <h3>候选人材料</h3>
           </div>
           <div className="mobile-material-actions">
             <label className="file-drop compact-drop">
               <Upload size={16} />
-              <span>{isExtracting ? "Parsing" : "Upload"}</span>
+              <span>{isExtracting ? "解析中" : "上传"}</span>
               <input multiple type="file" accept=".pdf,.docx,.txt,.md,.markdown" onChange={handleFiles} />
             </label>
             <a className="link-button" href="#candidate-context">
-              Edit material
+              编辑材料
             </a>
           </div>
           <div className="material-chips">
@@ -788,11 +805,11 @@ export default function Home() {
         <section className="chat-card">
           <div className="chat-card-head">
             <div>
-              <p className="eyebrow">AI Operations Workspace</p>
-              <h3>PeopleOps Intelligence Assistant</h3>
+              <p className="eyebrow">AI 运营工作区</p>
+              <h3>PeopleOps 智能助手</h3>
             </div>
             <div className="session-meta">
-              <span>{lastTaskId || threadId || "New session"}</span>
+              <span>{lastTaskId || threadId || "新会话"}</span>
               <strong>{tenantName}</strong>
             </div>
           </div>
@@ -811,13 +828,13 @@ export default function Home() {
                 <div className="message-avatar">
                   <Bot size={16} />
                 </div>
-                <p className="typing-state">Retrieving policy, candidate context, and executable actions...</p>
+                <p className="typing-state">正在检索制度、候选人上下文和可执行动作...</p>
               </article>
             ) : null}
           </div>
 
           <form className="composer" onSubmit={handleSubmit}>
-            <div className="prompt-rail" aria-label="Quick questions">
+            <div className="prompt-rail" aria-label="快捷问题">
               {quickPrompts.map((item) => (
                 <button key={item} type="button" onClick={() => setPrompt(item)}>
                   {item}
@@ -827,12 +844,12 @@ export default function Home() {
             <textarea
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
-              placeholder="For example: What is the lodging reimbursement standard? Does this resume match the JD? Help schedule a candidate interview tomorrow afternoon."
+              placeholder="例如：出差住宿报销标准是什么？这份简历和 JD 是否匹配？帮我安排候选人明天下午面试。"
               rows={3}
             />
             <button type="submit" disabled={isSending || !prompt.trim()}>
               <Send size={16} />
-              {isSending ? "Processing" : "Send"}
+              {isSending ? "处理中" : "发送"}
             </button>
           </form>
         </section>
@@ -843,34 +860,34 @@ export default function Home() {
           <section className="module-view">
             <div className="module-head">
               <div>
-                <p className="eyebrow">Candidate CRM</p>
-                <h3>Candidate records</h3>
-                <p>Review candidate material, role linkage, match status, and next actions in one place.</p>
+                <p className="eyebrow">候选人 CRM</p>
+                <h3>候选人档案</h3>
+                <p>统一查看候选人材料、岗位关联、匹配状态和下一步动作。</p>
               </div>
               <label className="module-action">
                 <Upload size={15} />
-                Import material
+                导入材料
                 <input multiple type="file" accept=".pdf,.docx,.txt,.md,.markdown" onChange={handleFiles} />
               </label>
             </div>
             <div className="data-table candidate-table">
               <div className="table-row table-head">
-                <span>Candidate / Queue</span>
-                <span>Role</span>
-                <span>Stage</span>
-                <span>Match status</span>
+                <span>候选人/队列</span>
+                <span>岗位</span>
+                <span>阶段</span>
+                <span>匹配状态</span>
               </div>
               {candidateRecords.map((candidate) => (
                 <button className="table-row" key={candidate.name} type="button" onClick={() => setActiveProductView("workspace")}>
                   <strong>{candidate.name}</strong>
                   <span>{candidate.role}</span>
-                  <span className={`state-chip ${candidate.stage === "Analyzed" ? "ok" : "warn"}`}>{candidate.stage}</span>
+                  <span className={`state-chip ${candidate.stage === "已分析" ? "ok" : "warn"}`}>{candidate.stage}</span>
                   <span>{candidate.fit}</span>
                 </button>
               ))}
             </div>
             {!resumeText.trim() && !resumeFiles.length ? (
-              <EmptyState icon={Users} tone="warn" title="No real candidate material yet" body="Import a resume or connect ATS to show a real candidate queue here." />
+              <EmptyState icon={Users} tone="warn" title="还没有真实候选人材料" body="导入简历或连接 ATS 后，这里会展示真实候选人队列。" />
             ) : null}
           </section>
         ) : null}
@@ -879,14 +896,14 @@ export default function Home() {
           <section className="module-view">
             <div className="module-head">
               <div>
-                <p className="eyebrow">Approval Center</p>
-                <h3>Approval center</h3>
-                <p>Review external actions generated by the agent, execution permissions, and compensating operations.</p>
+                <p className="eyebrow">审批中心</p>
+                <h3>审批中心</h3>
+                <p>集中处理 Agent 生成的外部动作、执行授权和可补偿操作。</p>
               </div>
               <div className="segmented-summary">
-                <span>{pendingApprovals.length} pending</span>
-                <span>{approvals.filter((item) => item.status === "APPROVED").length} approved</span>
-                <span>{approvals.filter((item) => item.status === "REJECTED").length} rejected</span>
+                <span>{pendingApprovals.length} 待审批</span>
+                <span>{approvals.filter((item) => item.status === "APPROVED").length} 已通过</span>
+                <span>{approvals.filter((item) => item.status === "REJECTED").length} 已拒绝</span>
               </div>
             </div>
             <div className="approval-board">
@@ -894,25 +911,25 @@ export default function Home() {
                 <article className="approval-item" key={`${item.id}-${item.status}`}>
                   <div>
                     <span className={`state-chip ${statusClass(item.status)}`}>{statusLabel(item.status)}</span>
-                    <strong>{shortText(item.candidate_name || item.action_type || item.subject_ref, "Candidate action")}</strong>
-                    <p>{item.interview_time ? `Interview time: ${formatDateTime(item.interview_time)}` : "Waiting for HRBP review before execution."}</p>
+                    <strong>{shortText(item.candidate_name || item.action_type || item.subject_ref, "候选人动作")}</strong>
+                    <p>{item.interview_time ? `面试时间：${formatDateTime(item.interview_time)}` : "等待 HRBP 审核后执行。"}</p>
                   </div>
                   {item.action_type && item.status === "PENDING" ? (
                     <div className="row-actions">
                       <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "approve")}>
                         <Check size={13} />
-                        Approve
+                        通过
                       </button>
                       <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "reject")}>
                         <X size={13} />
-                        Reject
+                        拒绝
                       </button>
                     </div>
                   ) : null}
                 </article>
               ))}
               {!approvals.length && !interviews.length ? (
-                <EmptyState icon={ClipboardList} title="No approval items" body="When the agent needs to send email, schedule interviews, or call external systems, items appear here." />
+                <EmptyState icon={ClipboardList} title="暂无审批项" body="当 Agent 需要发送邮件、安排面试或调用外部系统时，会进入审批中心。" />
               ) : null}
             </div>
           </section>
@@ -922,11 +939,11 @@ export default function Home() {
           <section className="module-view">
             <div className="module-head">
               <div>
-                <p className="eyebrow">Integration Hub</p>
-                <h3>Connectors and tools</h3>
-                <p>Manage enterprise system connections for ATS, calendar, email, vector stores, and object storage.</p>
+                <p className="eyebrow">集成中心</p>
+                <h3>连接器与工具</h3>
+                <p>管理 ATS、日历、邮件、向量库和对象存储等企业系统接入状态。</p>
               </div>
-              <span className="module-badge">{connectorSummary(connectors)} configured</span>
+              <span className="module-badge">{connectorSummary(connectors)} 已配置</span>
             </div>
             <div className="connector-grid">
               {connectors.map((connector) => (
@@ -941,14 +958,14 @@ export default function Home() {
               ))}
               {!connectors.length ? (
                 <>
-                  {["ATS", "Calendar", "Email", "Vector Store"].map((name) => (
+                    {["ATS", "日历", "邮件", "向量库"].map((name) => (
                     <article className="connector-card muted" key={name}>
                       <Plug size={16} />
                       <div>
                         <strong>{name}</strong>
-                        <p>Sync after entering the access password or configuring environment variables.</p>
+                        <p>输入口令或配置环境变量后同步。</p>
                       </div>
-                      <span className="state-chip neutral">Pending config</span>
+                      <span className="state-chip neutral">待配置</span>
                     </article>
                   ))}
                 </>
@@ -957,16 +974,16 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <Wrench size={16} />
-                Tool registry
+                工具注册表
               </div>
               <div className="compact-list">
                 {tools.slice(0, 8).map((tool) => (
                   <div key={tool.name}>
                     <strong>{tool.name}</strong>
-                    <span>{tool.compensatable ? "Compensatable" : "No compensation"}</span>
+                    <span>{tool.compensatable ? "可补偿" : "无补偿"}</span>
                   </div>
                 ))}
-                {!tools.length ? <EmptyState icon={Wrench} title="Tool catalog unavailable" body="Enter the access password to read the tool registry." /> : null}
+                {!tools.length ? <EmptyState icon={Wrench} title="工具目录不可见" body="输入访问口令后可读取工具 registry。" /> : null}
               </div>
             </section>
           </section>
@@ -976,9 +993,9 @@ export default function Home() {
           <section className="module-view">
             <div className="module-head">
               <div>
-                <p className="eyebrow">Governance</p>
-                <h3>Audit and compliance</h3>
-                <p>Inspect tasks, tool calls, approval actions, and audit-chain integrity.</p>
+                <p className="eyebrow">治理与审计</p>
+                <h3>审计与合规</h3>
+                <p>查看任务、工具调用、审批动作和审计链完整性。</p>
               </div>
               <span className={`module-badge ${auditValid ? "ok" : "warn"}`}>{auditLabel(auditValid)}</span>
             </div>
@@ -986,7 +1003,7 @@ export default function Home() {
               <section className="panel-card">
                 <div className="section-title">
                   <Database size={16} />
-                  Audit events
+                  审计事件
                 </div>
                 <div className="timeline">
                   {auditEvents.slice(0, 10).map((event, index) => (
@@ -995,13 +1012,13 @@ export default function Home() {
                       <p>{shortText(event.timestamp, "local")}</p>
                     </div>
                   ))}
-                  {!auditEvents.length ? <EmptyState icon={Database} title="No audit events" body="Enter the access password to view audit events for the current tenant." /> : null}
+                  {!auditEvents.length ? <EmptyState icon={Database} title="暂无审计事件" body="输入访问口令后可查看当前租户的审计事件。" /> : null}
                 </div>
               </section>
               <section className="panel-card">
                 <div className="section-title">
                   <ShieldCheck size={16} />
-                  Compliance checks
+                  合规检查
                 </div>
                 <div className="check-list">
                   {deploymentChecks.map((item) => (
@@ -1020,17 +1037,17 @@ export default function Home() {
           <section className="module-view">
             <div className="module-head">
               <div>
-                <p className="eyebrow">Admin Settings</p>
-                <h3>Settings and release checks</h3>
-                <p>Confirm API, authorization, model, tool execution mode, and repository release status.</p>
+                <p className="eyebrow">管理设置</p>
+                <h3>设置与发布检查</h3>
+                <p>集中确认 API、鉴权、模型、工具执行模式和仓库发布状态。</p>
               </div>
-              <span className="module-badge">Tenant {tenantName}</span>
+              <span className="module-badge">租户 {tenantName}</span>
             </div>
             <div className="settings-grid">
               <section className="panel-card">
                 <div className="section-title">
                   <Settings size={16} />
-                  Runtime configuration
+                  运行配置
                 </div>
                 <dl className="fact-list">
                   <div>
@@ -1038,15 +1055,15 @@ export default function Home() {
                     <dd>{API_BASE}</dd>
                   </div>
                   <div>
-                    <dt>Identity mode</dt>
+                    <dt>身份模式</dt>
                     <dd>{identityMode}</dd>
                   </div>
                   <div>
-                    <dt>Model</dt>
+                    <dt>模型</dt>
                     <dd>{health?.chat_model || "--"}</dd>
                   </div>
                   <div>
-                    <dt>Tool mode</dt>
+                    <dt>工具模式</dt>
                     <dd>{health?.tool_execution_mode || "--"}</dd>
                   </div>
                 </dl>
@@ -1054,10 +1071,10 @@ export default function Home() {
               <section className="panel-card">
                 <div className="section-title">
                   <GitBranch size={16} />
-                  Pre-release Git checks
+                  发布前 Git 检查
                 </div>
                 <div className="release-checklist">
-                  <p>The current repository includes a structure migration: old root files were removed and new `backend/`, `frontend/`, and `infra/` folders should be reviewed before staging.</p>
+                  <p>当前仓库包含结构迁移：旧根目录文件已移除，新 `backend/`、`frontend/`、`infra/` 目录需确认后再统一 stage。</p>
                   <code>git status --short</code>
                   <code>git diff --stat</code>
                 </div>
@@ -1065,9 +1082,9 @@ export default function Home() {
               <section className="panel-card production-card">
                 <div className="section-title">
                   <ShieldCheck size={16} />
-                  Live integration gates
+                  实机联调门禁
                   <span className="inline-loading">
-                    Verified {productionCheckSummary.verified} | Pending {productionCheckSummary.configured} | Failed {productionCheckSummary.failed}
+                    验证通过 {productionCheckSummary.verified} | 待验证 {productionCheckSummary.configured} | 失败 {productionCheckSummary.failed}
                   </span>
                 </div>
                 <div className="readiness-matrix">
@@ -1075,12 +1092,12 @@ export default function Home() {
                     <article className={item.status} key={item.id}>
                       <span className={`state-chip ${item.status === "verified" ? "ok" : item.status === "failed" ? "danger" : "warn"}`}>
                         {item.status === "verified"
-                          ? "Verified"
+                          ? "实机通过"
                           : item.status === "configured"
-                            ? "Configured"
+                            ? "已配置"
                             : item.status === "failed"
-                              ? "Failed"
-                              : "Not configured"}
+                              ? "验证失败"
+                              : "未配置"}
                       </span>
                       <div>
                         <strong>{item.label}</strong>
@@ -1095,20 +1112,20 @@ export default function Home() {
               <section className="panel-card">
                 <div className="section-title">
                   <Activity size={16} />
-                  Observability summary
+                  观测性摘要
                 </div>
                 <div className="ops-summary">
                   <div>
                     <strong>{operations ? `${Math.round(operations.task_success_rate * 100)}%` : "--"}</strong>
-                    <span>Task success rate</span>
+                    <span>任务成功率</span>
                   </div>
                   <div>
                     <strong>{failedToolCount}</strong>
-                    <span>Tool failures</span>
+                    <span>工具失败</span>
                   </div>
                   <div>
                     <strong>{readinessWarnings.length}</strong>
-                    <span>Launch warnings</span>
+                    <span>上线告警</span>
                   </div>
                 </div>
               </section>
@@ -1118,7 +1135,7 @@ export default function Home() {
       </section>
 
       <aside className="evidence-panel">
-        <div className="inspector-tabs" role="tablist" aria-label="Runtime sidebar">
+        <div className="inspector-tabs" role="tablist" aria-label="运行侧栏">
           {inspectorTabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -1143,19 +1160,19 @@ export default function Home() {
               <section className="panel-card attention-card">
                 <div className="section-title">
                   <AlertTriangle size={16} />
-                  Priority actions
+                  优先处理
                 </div>
                 <div className="priority-list">
                   {pendingApprovals.length ? (
                     <button type="button" onClick={() => setActiveInspector("actions")}>
-                      <span className="state-chip warn">Pending review</span>
-                      <p>{pendingApprovals.length} actions need confirmation</p>
+                      <span className="state-chip warn">待审批</span>
+                      <p>{pendingApprovals.length} 个动作需要确认</p>
                     </button>
                   ) : null}
                   {failedToolCount ? (
                     <button type="button" onClick={() => setActiveInspector("actions")}>
-                      <span className="state-chip danger">Tool failures</span>
-                      <p>{failedToolCount} executions failed. Review connector settings or parameters.</p>
+                      <span className="state-chip danger">工具失败</span>
+                      <p>{failedToolCount} 次执行失败，建议复核连接器或参数。</p>
                     </button>
                   ) : null}
                 </div>
@@ -1165,49 +1182,49 @@ export default function Home() {
             <section className="panel-card priority-card">
               <div className="section-title">
                 <ShieldCheck size={16} />
-                Runtime status
-                {isRefreshingOps ? <span className="inline-loading">Refreshing</span> : null}
+                运行状态
+                {isRefreshingOps ? <span className="inline-loading">刷新中</span> : null}
               </div>
               <div className="metric-grid">
                 <div>
                   <strong>{score ?? "--"}</strong>
-                  <span>Readiness score</span>
+                  <span>就绪分</span>
                 </div>
                 <div>
                   <strong>{operations?.task_count ?? tasks.length}</strong>
-                  <span>Tasks</span>
+                  <span>任务数</span>
                 </div>
                 <div>
                   <strong>{connectorSummary(connectors)}</strong>
-                  <span>Connectors</span>
+                  <span>连接器</span>
                 </div>
               </div>
               <dl className="fact-list">
                 <div>
-                  <dt>Tool mode</dt>
+                  <dt>工具模式</dt>
                   <dd>{health?.tool_execution_mode || "--"}</dd>
                 </div>
                 <div>
-                  <dt>Database</dt>
+                  <dt>数据库</dt>
                   <dd>{health?.database_backend || "--"}</dd>
                 </div>
                 <div>
-                  <dt>Vector store</dt>
+                  <dt>向量库</dt>
                   <dd>{health?.vector_backend || "--"}</dd>
                 </div>
               </dl>
               <div className="ops-summary">
                 <div>
                   <strong>{operations ? `${Math.round(operations.task_success_rate * 100)}%` : "--"}</strong>
-                  <span>Task success rate</span>
+                  <span>任务成功率</span>
                 </div>
                 <div>
                   <strong>{operations?.tool_execution_count ?? toolExecutions.length}</strong>
-                  <span>Tool executions</span>
+                  <span>工具执行</span>
                 </div>
                 <div>
                   <strong>{operations?.tool_status_counts?.FAILED ?? 0}</strong>
-                  <span>Tool failures</span>
+                  <span>工具失败</span>
                 </div>
               </div>
             </section>
@@ -1215,7 +1232,7 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <AlertTriangle size={16} />
-                Launch checks
+                上线检查
               </div>
               <div className="check-list">
                 {deploymentChecks.map((item) => (
@@ -1232,7 +1249,7 @@ export default function Home() {
                   ))}
                 </div>
               ) : (
-                <EmptyState icon={ShieldCheck} tone="ok" title="Launch checks passed" body="The current runtime configuration has no blocking readiness warnings." />
+                <EmptyState icon={ShieldCheck} tone="ok" title="上线检查通过" body="当前运行配置没有阻塞性的就绪告警。" />
               )}
             </section>
           </>
@@ -1243,12 +1260,12 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <FileText size={16} />
-                Citations and context
+                引用与上下文
               </div>
               <div className="evidence-note">
                 {latestUserQuestion
-                  ? `Latest question: ${shortText(latestUserQuestion)}`
-                  : "Submit a conversation to show the latest question and supporting evidence here."}
+                  ? `最近问题：${shortText(latestUserQuestion)}`
+                  : "提交一次对话后，这里会展示最近问题和关联证据。"}
               </div>
               <div className="citation-list">
                 {latestAssistantEvidence.slice(0, 4).map((item, index) => (
@@ -1257,7 +1274,7 @@ export default function Home() {
                       <strong>{item.source}</strong>
                       <span>{inferPageLabel(item.source)}</span>
                     </div>
-                    <p>{shortText(item.snippet, "No citation excerpt")}</p>
+                    <p>{shortText(item.snippet, "暂无引用片段")}</p>
                     <div className="evidence-meta">
                       <span className={`state-chip ${keywordHits(latestUserQuestion, item.snippet).length ? "ok" : "neutral"}`}>
                         <SearchCheck size={12} />
@@ -1270,7 +1287,7 @@ export default function Home() {
                   </div>
                 ))}
                 {!latestAssistantEvidence.length ? (
-                  <EmptyState icon={FileText} title="Waiting for evidence" body="After a policy Q&A request, sources, excerpts, pages, and keyword hits appear here." />
+                  <EmptyState icon={FileText} title="等待证据" body="发送一次政策问答后，这里会展示来源、片段、页码和关键词命中。" />
                 ) : null}
               </div>
             </section>
@@ -1278,22 +1295,22 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <GitBranch size={16} />
-                Task replay
+                任务回放
               </div>
               <div className="timeline">
                 {tasks.slice(0, 5).map((task) => (
                   <button className="timeline-button" type="button" key={task.task_id} onClick={() => selectTask(task.task_id)} disabled={loadingTaskId === task.task_id}>
-                    <span>{loadingTaskId === task.task_id ? "Loading" : statusLabel(task.status)}</span>
+                    <span>{loadingTaskId === task.task_id ? "读取中" : statusLabel(task.status)}</span>
                     <p>{shortText(task.input_text)}</p>
                   </button>
                 ))}
-                {!tasks.length ? <EmptyState icon={GitBranch} title="No task replay" body="Send an agent request to create task records and an event timeline." /> : null}
+                {!tasks.length ? <EmptyState icon={GitBranch} title="暂无任务回放" body="发送一次 Agent 请求后会出现任务记录和事件时间线。" /> : null}
               </div>
               {selectedTask ? (
                 <div className="event-list">
                   <div className="trace-summary">
                     <div>
-                      <span>Task</span>
+                      <span>任务</span>
                       <strong>{statusLabel(selectedTask.status)}</strong>
                     </div>
                     <div>
@@ -1301,7 +1318,7 @@ export default function Home() {
                       <strong>{selectedTask.intent || "--"}</strong>
                     </div>
                     <div>
-                      <span>Events</span>
+                      <span>事件</span>
                       <strong>{selectedTask.events?.length || 0}</strong>
                     </div>
                   </div>
@@ -1325,7 +1342,7 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <ClipboardList size={16} />
-                Actions and approvals
+                动作与审批
               </div>
               <div className="timeline">
                 {[...approvals, ...interviews].slice(0, 6).map((item) => (
@@ -1337,11 +1354,11 @@ export default function Home() {
                         <div className="row-actions">
                           <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "approve")}>
                             <Check size={13} />
-                            {pendingApprovalId === item.id ? "Submitting" : "Approve"}
+                            {pendingApprovalId === item.id ? "提交中" : "通过"}
                           </button>
                           <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "reject")}>
                             <X size={13} />
-                            Reject
+                            拒绝
                           </button>
                         </div>
                       ) : null}
@@ -1349,7 +1366,7 @@ export default function Home() {
                         <div className="row-actions">
                           <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "execute")}>
                             <Play size={13} />
-                            {pendingApprovalId === item.id ? "Executing" : "Execute"}
+                            {pendingApprovalId === item.id ? "执行中" : "执行"}
                           </button>
                         </div>
                       ) : null}
@@ -1357,7 +1374,7 @@ export default function Home() {
                   </div>
                 ))}
                 {!approvals.length && !interviews.length ? (
-                  <EmptyState icon={ClipboardList} title="No action records" body="Interview scheduling, approvals, or compensating actions generated by the agent appear here." />
+                  <EmptyState icon={ClipboardList} title="暂无动作记录" body="Agent 生成面试安排、审批或补偿动作后，会在这里出现。" />
                 ) : null}
               </div>
             </section>
@@ -1365,23 +1382,23 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <Wrench size={16} />
-                Tool catalog
+                工具目录
               </div>
               <div className="compact-list">
                 {tools.slice(0, 5).map((tool) => (
                   <div key={tool.name}>
                     <strong>{tool.name}</strong>
-                    <span>{tool.compensatable ? "Compensatable" : "No compensation"}</span>
+                    <span>{tool.compensatable ? "可补偿" : "无补偿"}</span>
                   </div>
                 ))}
-                {!tools.length ? <EmptyState icon={Wrench} title="Tool catalog unavailable" body="Enter the access password to read the tool registry, or confirm the backend is running." /> : null}
+                {!tools.length ? <EmptyState icon={Wrench} title="工具目录不可见" body="输入访问口令后可读取工具 registry，或确认后端已启动。" /> : null}
               </div>
             </section>
 
             <section className="panel-card">
               <div className="section-title">
                 <Activity size={16} />
-                Recent tool executions
+                最近工具执行
               </div>
               <div className="timeline">
                 {toolExecutions.slice(0, 6).map((execution) => (
@@ -1395,12 +1412,12 @@ export default function Home() {
                     <div>
                       <p>{execution.tool_name}</p>
                       <p className="subtle">
-                        Attempts {execution.attempts} | {shortText(execution.idempotency_key, "No idempotency key")}
+                        尝试 {execution.attempts} 次 | {shortText(execution.idempotency_key, "无幂等键")}
                       </p>
                     </div>
                   </button>
                 ))}
-                {!toolExecutions.length ? <EmptyState icon={Activity} title="No tool executions" body="Trigger a candidate follow-up action to show execution status, duration, and result here." /> : null}
+                {!toolExecutions.length ? <EmptyState icon={Activity} title="暂无工具执行" body="触发一次候选人跟进动作后，会显示执行状态、耗时和返回结果。" /> : null}
               </div>
               {selectedToolExecution ? (
                 <div className="tool-detail">
@@ -1411,15 +1428,15 @@ export default function Home() {
                     </div>
                     <div>
                       <RotateCcw size={13} />
-                      <span>{selectedToolExecution.attempts} attempts</span>
+                      <span>{selectedToolExecution.attempts} 次尝试</span>
                     </div>
                     <div>
                       <Hash size={13} />
-                      <span>{shortText(selectedToolExecution.idempotency_key, "No idempotency key")}</span>
+                      <span>{shortText(selectedToolExecution.idempotency_key, "无幂等键")}</span>
                     </div>
                   </div>
                   <div className="json-preview">
-                    <strong>{selectedToolExecution.error_json ? "Error details" : "Result"}</strong>
+                    <strong>{selectedToolExecution.error_json ? "错误详情" : "返回结果"}</strong>
                     <pre>{previewJson(parseJsonSafe(selectedToolExecution.error_json || selectedToolExecution.response_json))}</pre>
                   </div>
                 </div>
@@ -1429,7 +1446,7 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <Plug size={16} />
-                Connectors
+                连接器
               </div>
               <div className="compact-list">
                 {connectors.slice(0, 6).map((connector) => (
@@ -1438,7 +1455,7 @@ export default function Home() {
                     <span>{statusLabel(connector.status)}</span>
                   </div>
                 ))}
-                {!connectors.length ? <EmptyState icon={Plug} title="Connectors not loaded" body="Connector catalog access requires permission. If the password is set, confirm the backend is available." /> : null}
+                {!connectors.length ? <EmptyState icon={Plug} title="连接器未读取" body="需要访问权限后才能读取连接器目录；若已输入口令，请确认后端服务可用。" /> : null}
               </div>
             </section>
           </>
@@ -1448,7 +1465,7 @@ export default function Home() {
           <section className="panel-card">
             <div className="section-title">
               <Database size={16} />
-              Audit chain
+              审计链
             </div>
             <div className="timeline">
               {auditEvents.slice(0, 6).map((event, index) => (
@@ -1457,7 +1474,7 @@ export default function Home() {
                   <p>{shortText(event.timestamp, "local")}</p>
                 </div>
               ))}
-              {!auditEvents.length ? <EmptyState icon={Database} title="Audit events not loaded" body="Enter the access password to view audit events. If there are no events, the current tenant has no displayable records yet." /> : null}
+              {!auditEvents.length ? <EmptyState icon={Database} title="审计事件未加载" body="输入访问口令后可查看审计事件；没有事件时表示当前租户暂无可展示记录。" /> : null}
             </div>
           </section>
         ) : null}
