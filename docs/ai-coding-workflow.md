@@ -12,10 +12,10 @@ This project is intentionally maintained as an AI-coding-friendly codebase.
 
 ## Current Examples
 
-- `core/workflow.py`: LangGraph routing and tool orchestration.
-- `core/tools.py`: tool adapter abstraction with local persisted artifacts.
-- `core/rag_engine.py`: persistent Chroma index with manifest-based invalidation.
-- `tests/test_core.py`: regression tests that capture behavior added during AI-assisted iteration.
+- `backend/core/workflow.py`: LangGraph routing and tool orchestration.
+- `backend/core/tools.py`: tool adapter abstraction with local persisted artifacts.
+- `backend/core/rag_engine.py`: persistent Chroma index with manifest-based invalidation.
+- `backend/tests/test_core.py`: regression tests that capture behavior added during AI-assisted iteration.
 
 ## Interview Talking Points
 

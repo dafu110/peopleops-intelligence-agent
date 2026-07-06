@@ -1,12 +1,18 @@
 {
-  "name": "Python 3",
+  "name": "PeopleOps Intelligence Console",
   // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
   "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    }
+  },
   "customizations": {
     "codespaces": {
       "openFiles": [
         "README.md",
-        "app.py"
+        "backend/api.py",
+        "frontend/app/page.tsx"
       ]
     },
     "vscode": {
@@ -17,17 +23,23 @@
       ]
     }
   },
-  "updateContentCommand": "[ -f packages.txt ] && sudo apt update && sudo apt upgrade -y && sudo xargs apt install -y <packages.txt; [ -f requirements.txt ] && pip3 install --user -r requirements.txt; pip3 install --user streamlit; echo '✅ Packages installed and Requirements met'",
+  "updateContentCommand": "[ -f packages.txt ] && sudo apt update && sudo apt upgrade -y && sudo xargs apt install -y <packages.txt; [ -f backend/requirements.txt ] && pip3 install --user -r backend/requirements.txt; corepack enable; cd frontend && pnpm install --frozen-lockfile; echo 'Packages installed and requirements met'",
   "postAttachCommand": {
-    "server": "streamlit run app.py --server.enableCORS false --server.enableXsrfProtection false"
+    "api": "cd backend && python -m uvicorn api:app --host 0.0.0.0 --port 8000",
+    "web": "cd frontend && pnpm dev --hostname 0.0.0.0 --port 3000"
   },
   "portsAttributes": {
-    "8501": {
-      "label": "Application",
+    "3000": {
+      "label": "Web Console",
+      "onAutoForward": "openPreview"
+    },
+    "8000": {
+      "label": "FastAPI",
       "onAutoForward": "openPreview"
     }
   },
   "forwardPorts": [
-    8501
+    3000,
+    8000
   ]
 }

@@ -1,0 +1,74 @@
+{
+  "id": "peopleops-intelligence-agent",
+  "name": "PeopleOps Intelligence Agent",
+  "owner": "PeopleOps",
+  "runtime": "LangGraph via backend/core/workflow.py",
+  "objective": "Route HR operator requests to policy RAG, resume/JD evaluation, or governed candidate follow-up tools with auditable evidence.",
+  "users": ["HRBP", "recruiter", "people operations admin", "viewer"],
+  "allowed_actions": [
+    "Answer policy questions using approved enterprise documents and citations.",
+    "Evaluate candidate resumes against a JD with structured pros, cons, and score.",
+    "Create interview invitation actions through the registered schedule_interview tool.",
+    "Update existing candidate action stages through the registered update_candidate_stage tool.",
+    "Create approval requests when TOOL_EXECUTION_MODE requires human review.",
+    "Record task events, audit events, and tool execution metadata."
+  ],
+  "disallowed_actions": [
+    "Invent policy answers without retrieved evidence.",
+    "Send live email or calendar invites unless live mode and connector credentials are configured.",
+    "Expose raw phone numbers, emails, or national IDs in audit payloads.",
+    "Execute unregistered tools or tools outside the tenant scope."
+  ],
+  "state_machine": [
+    {"node": "intent_node", "purpose": "Classify the user request as action_tool, resume, or rag."},
+    {"node": "plan_node", "purpose": "Create a short auditable execution plan and stop condition."},
+    {"node": "rag_node", "purpose": "Retrieve policy context, answer with evidence, and cite sources."},
+    {"node": "resume_node", "purpose": "Analyze resume/JD fit and surface risks or missing information."},
+    {"node": "tool_node", "purpose": "Select schedule_interview or update_candidate_stage, extract arguments, and execute the governed tool."},
+    {"node": "finalize_node", "purpose": "Record final reply, evidence count, plan length, and completion event."}
+  ],
+  "tools": [
+    {
+      "name": "schedule_interview",
+      "module": "backend/core/tools.py",
+      "mutating": true,
+      "idempotent": true,
+      "compensatable": true,
+      "human_approval_modes": ["approval", "pending_approval"],
+      "side_effects": ["local email draft", "calendar .ics", "local ATS export", "approval request"]
+    },
+    {
+      "name": "update_candidate_stage",
+      "module": "backend/core/tools.py",
+      "mutating": true,
+      "idempotent": true,
+      "compensatable": true,
+      "human_approval_modes": ["approval", "pending_approval"],
+      "side_effects": ["interview action status update", "approval request"]
+    }
+  ],
+  "memory_and_state": {
+    "thread_memory": "LangGraph MemorySaver keyed by thread_id.",
+    "durable_task_state": "SQLite or PostgreSQL agent_task_runs and agent_task_events.",
+    "audit_state": "Hash-chained JSONL audit events with request_id and tenant scope."
+  },
+  "evaluation": {
+    "unit_tests": "cd backend && python -m unittest tests.test_core",
+    "rag_dataset_check": "cd backend && python scripts/evaluate_rag.py --check-dataset",
+    "rag_fixture_gate": "cd backend && python scripts/evaluate_rag.py --fixture-eval",
+    "rag_generation_fixture_gate": "cd backend && python scripts/evaluate_rag.py --generation-fixture",
+    "rag_live_generation_readiness": "cd backend && python scripts/evaluate_rag.py --generation-readiness",
+    "rag_live_generation_gate": "cd backend && python scripts/evaluate_rag.py --generation-eval",
+    "agent_golden_traces": "cd backend && python scripts/evaluate_agent_traces.py",
+    "dataset": "evals/rag_eval.jsonl",
+    "agent_trace_dataset": "evals/agent_golden_traces.jsonl",
+    "metrics": ["keyword_coverage", "citation_count", "citation_correctness", "pii_leakage", "forbidden_hits"]
+  },
+  "production_notes": [
+    "Use REQUIRE_ACCESS_PASSWORD or enterprise identity before exposing the API.",
+    "Use PostgreSQL, managed vector storage, and object storage for production state.",
+    "Keep TOOL_EXECUTION_MODE=approval for candidate communications requiring human review.",
+    "Run live RAG generation eval only when embedding models are cached locally or external model download has been explicitly approved, and only when the chat model endpoint is local or external policy-context transfer has been approved.",
+    "Review /audit/integrity and /operations/summary before exporting evidence."
+  ]
+}

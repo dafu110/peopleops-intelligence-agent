@@ -1,20 +1,22 @@
-# PeopleOps Agent Platform
+﻿# PeopleOps Intelligence Agent
 
-PeopleOps Agent Platform is an AI-native HRBP workbench for policy Q&A, resume/JD matching, candidate follow-up actions, approvals, audit evidence, and local ATS-style records. It is designed as a practical enterprise-console reference project rather than a single-purpose RAG demo.
+PeopleOps Intelligence Agent is an AI-native HRBP workbench for policy Q&A, resume/JD matching, candidate follow-up actions, approvals, audit evidence, and local ATS-style records. It is designed as a practical enterprise-console reference project rather than a single-purpose RAG demo.
 
 ## Reading Guide
 
 Start here if you are reviewing the project for the first time:
 
 1. **Product Snapshot**: what the app does and what the UI looks like.
-2. **Quick Start**: how to run the Streamlit workbench locally.
+2. **Quick Start**: how to run the professional web console and API locally.
 3. **Closed-Loop Experience**: how the operator flow works end to end.
 4. **Core Capabilities**: which agent, RAG, governance, and persistence pieces are included.
 5. **Architecture, API, and Configuration**: implementation and deployment details.
 
 ## Product Snapshot
 
-The Streamlit workbench uses an Enterprise Console design system: a cool gray-blue workspace background, white operational panels, fine borders, compact metrics, status-color edge accents, dense evidence rows, and an auditable closed-loop workflow.
+The primary product surface is now a Next.js web console backed by the FastAPI control plane. It uses a professional three-panel workbench: context intake on the left, a single Agent conversation workspace in the center, and evidence, approvals, runtime state, and audit signals on the right.
+
+The Streamlit workbench remains available as a local demo/debug surface, but the formal interface should be the web console.
 
 ```text
 Assemble context -> Agent judgment -> Execute action -> Governance evidence
@@ -26,15 +28,33 @@ Assemble context -> Agent judgment -> Execute action -> Governance evidence
 
 ## Quick Start
 
+Run the FastAPI backend:
+
 ```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
 Copy-Item .env.example .env
-python -m streamlit run app.py
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python -m uvicorn api:app --host 127.0.0.1 --port 8000
 ```
 
-Open `http://localhost:8501`.
+Run the professional frontend in another terminal:
+
+```powershell
+cd frontend
+pnpm install
+pnpm dev
+```
+
+Open `http://127.0.0.1:3000`.
+
+The Streamlit demo can still be started from the backend folder with:
+
+```powershell
+cd backend
+python -m streamlit run app.py
+```
 
 On Windows, if dependency installation fails while unpacking `torch` because the repository path is too deep, use the short-path setup in [`docs/clean-install-and-test.md`](docs/clean-install-and-test.md).
 
@@ -43,27 +63,27 @@ On Windows, if dependency installation fails while unpacking `torch` because the
 The app is organized around the daily flow of an HR operator.
 
 - **Assemble context**: upload candidate resumes, paste the JD, preview extracted resume text, and check runtime readiness.
-- **Agent judgment**: route questions to policy RAG, resume/JD matching, or action tools through the LangGraph workflow.
+- **Agent judgment**: route questions to policy RAG, resume/JD matching, or action tools through the LangGraph workflow from one primary input.
 - **Execute action**: create local candidate follow-up actions, email drafts, calendar artifacts, approval requests, and ATS sync payloads.
 - **Governance evidence**: review recent actions, pending approvals, audit events, connector readiness, and audit-chain integrity.
 
-The UI intentionally keeps a restrained enterprise palette while avoiding a flat white canvas: a lightly tinted top panel, compact status pills, aligned workflow cards, a closed-loop rail, operational metrics, and ledger-style evidence rows. The committed screenshots are full-page captures so the README shows the complete workbench and governance surfaces rather than cropped viewports.
+The product UI intentionally avoids duplicate search boxes: evidence retrieval is shown as part of the Agent workflow rather than exposed as a second manual query path.
 
 ## Core Capabilities
 
-- AI agent workflow in `core/workflow.py` with intent routing for RAG, resume analysis, and tool execution.
-- Enterprise policy retrieval in `core/rag_engine.py` with persistent Chroma indexing and page-aware citations.
-- Resume/JD matching in `core/matcher.py` with structured fit analysis output.
-- Local tool execution in `core/tools.py` for candidate follow-up scheduling, email drafts, calendar `.ics` files, ATS exports, and approval gates.
-- SQLite persistence in `core/database.py` for users, action records, approval requests, tenant scope, and RAG eval metrics.
+- AI agent workflow in `backend/core/workflow.py` with intent routing for RAG, resume analysis, and tool execution.
+- Enterprise policy retrieval in `backend/core/rag_engine.py` with persistent Chroma indexing and page-aware citations.
+- Resume/JD matching in `backend/core/matcher.py` with structured fit analysis output.
+- Local tool execution in `backend/core/tools.py` for candidate follow-up scheduling, email drafts, calendar `.ics` files, ATS exports, and approval gates.
+- SQLite persistence in `backend/core/database.py` for users, action records, approval requests, tenant scope, and RAG eval metrics.
 - Security and governance foundations: access password support, roles, tenant headers, PII redaction, hash-chained audit logs, and audit integrity checks.
-- FastAPI control plane in `api.py` for health, readiness, identity, chat, action records, approvals, connectors, and audit endpoints.
-- Deployment assets: `Dockerfile`, `docker-compose.yml`, `.devcontainer`, and deployment notes under `docs/`.
+- FastAPI control plane in `backend/api.py` for health, readiness, identity, chat, action records, approvals, connectors, and audit endpoints.
+- Deployment assets: `infra/Dockerfile`, `infra/docker-compose.yml`, `.devcontainer`, and deployment notes under `docs/`.
 
 ## Architecture
 
 ```text
-Streamlit Workbench / FastAPI
+Next.js Web Console / Streamlit Demo / FastAPI
         |
 LangGraph workflow
   |-- intent router
@@ -84,6 +104,7 @@ Engineering services
 ## API Backend
 
 ```powershell
+cd backend
 python -m uvicorn api:app --host 0.0.0.0 --port 8000
 ```
 
@@ -107,27 +128,31 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 
 | Path | Purpose |
 | --- | --- |
-| `app.py` | Streamlit workbench and Enterprise Console closed-loop UI. |
-| `api.py` | FastAPI control plane for chat, identity, readiness, action records, approvals, connectors, and audit data. |
-| `core/` | Agent workflow, RAG, matcher, security, audit, tenancy, database, connectors, and tool execution modules. |
+| `frontend/` | Next.js professional Agent console for context intake, chat, evidence, approvals, and audit status. |
+| `backend/app.py` | Streamlit workbench and local debug UI. |
+| `backend/api.py` | FastAPI control plane for chat, identity, readiness, action records, approvals, connectors, and audit data. |
+| `backend/core/` | Agent workflow, RAG, matcher, security, audit, tenancy, database, connectors, and tool execution modules. |
 | `data/` | Sample HR policy, resume, and JD documents used by the demo. |
 | `docs/` | Deployment notes, clean-install notes, AI coding workflow notes, and product screenshots. |
+| `docs/project/` | Archived project planning notes and delivery context. |
 | `evals/` | RAG evaluation dataset. |
-| `scripts/` | Utility scripts for password hashing and RAG evaluation. |
-| `tests/` | Unit tests for core behavior, API control plane, security, tenancy, and evaluation helpers. |
+| `infra/` | Dockerfile and Docker Compose deployment assets. |
+| `var/` | Local runtime state such as SQLite, audit logs, generated artifacts, and Chroma indexes. |
+| `backend/scripts/` | Utility scripts for password hashing and RAG evaluation. |
+| `backend/tests/` | Unit tests for core behavior, API control plane, security, tenancy, and evaluation helpers. |
 
 ## Configuration
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `APP_NAME` | `PeopleOps Agent Platform` | Product name |
+| `APP_NAME` | `PeopleOps Intelligence Agent` | Product name |
 | `OPENAI_API_KEY` | empty | Model API key |
 | `OPENAI_API_BASE` | empty | OpenAI-compatible base URL |
 | `OPENAI_MODEL` | `deepseek-chat` | Chat model |
 | `EMBEDDING_MODEL` | `BAAI/bge-small-zh-v1.5` | Chinese-friendly embedding model |
-| `HR_POLICY_PDF` | `data/员工手册测试版.pdf` | Policy knowledge base |
-| `CHROMA_PERSIST_DIR` | `.chroma/policy` | Persistent vector index |
-| `RAG_MANIFEST_PATH` | `.chroma/policy/manifest.json` | RAG index manifest |
+| `HR_POLICY_PDF` | sample PDF under `data/` | Policy knowledge base; `.env.example` points to `data/鍛樺伐鎵嬪唽娴嬭瘯鐗?pdf`. |
+| `CHROMA_PERSIST_DIR` | `var/chroma/policy` | Persistent vector index |
+| `RAG_MANIFEST_PATH` | `var/chroma/policy/manifest.json` | RAG index manifest |
 | `RAG_CHUNK_SIZE` | `400` | RAG chunk size |
 | `RAG_CHUNK_OVERLAP` | `40` | RAG chunk overlap |
 | `RAG_TOP_K` | `3` | Retrieved chunks per question |
@@ -135,8 +160,8 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 | `REQUIRE_ACCESS_PASSWORD` | `false` | Requires `ACCESS_PASSWORD` for API access |
 | `ACCESS_PASSWORD` | empty | Optional access password |
 | `ACCESS_PASSWORD_MIN_LENGTH` | `12` | Minimum plain-text password length warning threshold |
-| `APP_DB_PATH` | `.runtime/peopleops.sqlite3` | SQLite app database |
-| `AUDIT_LOG_PATH` | `.runtime/audit/events.jsonl` | JSONL audit log |
+| `APP_DB_PATH` | `var/runtime/peopleops.sqlite3` | SQLite app database |
+| `AUDIT_LOG_PATH` | `var/runtime/audit/events.jsonl` | JSONL audit log |
 | `AUDIT_LOG_MAX_BYTES` | `5000000` | Audit log rotation threshold |
 | `AUDIT_HASH_CHAIN_ENABLED` | `true` | Adds `previous_event_hash` and `event_hash` to audit records |
 | `API_RATE_LIMIT_PER_MINUTE` | `120` | Per-client in-memory API rate limit; use gateway limits in production |
@@ -148,9 +173,9 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 | `OBJECT_STORAGE_URI` | empty | S3, MinIO, OSS, or managed object storage URI for production files |
 | `APPROVAL_REQUIRED_ACTIONS` | `send_email,calendar_invite,ats_stage_change,offer_draft,rejection_draft` | Tool actions that require human confirmation |
 | `CONFIGURED_CONNECTOR_ENV` | empty | Comma-separated connector env vars present in this deployment |
-| `EMAIL_DRAFT_DIR` | `.runtime/email_drafts` | Generated `.eml` drafts |
-| `CALENDAR_DIR` | `.runtime/calendar` | Generated `.ics` files |
-| `ATS_EXPORT_DIR` | `.runtime/ats_exports` | Local ATS sync payloads |
+| `EMAIL_DRAFT_DIR` | `var/runtime/email_drafts` | Generated `.eml` drafts |
+| `CALENDAR_DIR` | `var/runtime/calendar` | Generated `.ics` files |
+| `ATS_EXPORT_DIR` | `var/runtime/ats_exports` | Local ATS sync payloads |
 | `TOOL_EXECUTION_MODE` | `local` | `dry_run`, `approval`, `local`, or `live` |
 | `SMTP_HOST` | empty | SMTP host used only in `live` tool mode |
 | `SMTP_PORT` | `587` | SMTP port |
@@ -160,7 +185,7 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 
 - Set `ENTERPRISE_MODE=true` and `REQUIRE_ACCESS_PASSWORD=true` before exposing the API beyond a local demo.
 - Store `ACCESS_PASSWORD` as `pbkdf2_sha256$...`; plain text and legacy `sha256:` values are accepted for compatibility but reported in readiness warnings.
-- Generate a password hash with `python scripts/hash_password.py`, then paste the output into `.env` as `ACCESS_PASSWORD`.
+- Generate a password hash with `python backend/scripts/hash_password.py`, then paste the output into `.env` as `ACCESS_PASSWORD`.
 - Use `TOOL_EXECUTION_MODE=approval` when candidate follow-up actions should create an auditable pending action instead of immediately generating email, calendar, or ATS artifacts.
 - Use `X-Tenant-ID`, `X-Org-ID`, and `X-Department-ID` on API calls to isolate action records, approvals, audit context, and downstream ATS payloads.
 - Review `/approvals` before executing follow-up messages, rejection drafts, offer drafts, calendar invites, or ATS stage changes.
@@ -172,5 +197,7 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 ## Docker
 
 ```powershell
-docker compose up --build
+docker compose -f infra/docker-compose.yml up --build
 ```
+
+Open the web console at `http://127.0.0.1:3000`; the FastAPI control plane is exposed at `http://127.0.0.1:8000`.

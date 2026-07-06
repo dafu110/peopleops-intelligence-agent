@@ -1,9 +1,26 @@
+# Python
 venv/
-.env
+.venv/
+backend/.venv/
 __pycache__/
 .pytest_cache/
 *.pyc
+
+# Local secrets
+.env
 .streamlit/secrets.toml
+
+# Frontend build/dependencies
+node_modules/
+.next/
+dist/
+output/
+*.tsbuildinfo
+
+# Local runtime state
+var/chroma/
+var/runtime/
+.playwright-cli/
 chroma/
 .chroma/
 .runtime/

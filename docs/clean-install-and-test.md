@@ -1,14 +1,14 @@
-# Clean Install And Test Evidence
+﻿# Clean Install And Test Evidence
 
-This note records a reproducible local validation flow for PeopleOps Agent Platform. It is intended for repository QA, handoff review, and fresh-machine setup.
+This note records a reproducible local validation flow for PeopleOps Intelligence Agent. It is intended for repository QA, handoff review, and fresh-machine setup.
 
 ## Environment Used For Validation
 
 - Date: 2026-06-24
 - OS: Windows
 - Python: 3.14
-- Dependency source: `requirements.txt`
-- Test command: `python -m unittest discover -s tests`
+- Dependency source: `backend/requirements.txt`
+- Test command: `python -m unittest discover -s backend/tests`
 
 ## Windows Long Path Note
 
@@ -36,7 +36,7 @@ python -m venv $venv
 $venvPython = Join-Path $venv "Scripts\python.exe"
 
 & $venvPython -m pip install --upgrade pip
-& $venvPython -m pip install -r requirements.txt
+& $venvPython -m pip install -r backend/requirements.txt
 ```
 
 For a standard short project path, the usual local project virtual environment also works:
@@ -44,17 +44,18 @@ For a standard short project path, the usual local project virtual environment a
 ```powershell
 python -m venv venv
 .\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
 ## Validation Commands
 
 ```powershell
 $venvPython = Join-Path $env:TEMP "poap-venv\Scripts\python.exe"
-$coreFiles = Get-ChildItem .\core -Filter *.py -File | Select-Object -ExpandProperty FullName
+$coreFiles = Get-ChildItem .\backend\core -Filter *.py -File | Select-Object -ExpandProperty FullName
 
-& $venvPython -m py_compile app.py api.py $coreFiles
-& $venvPython -m unittest discover -s tests
+& $venvPython -m py_compile backend/app.py backend/api.py $coreFiles
+$env:PYTHONPATH = Join-Path (Get-Location) "backend"
+& $venvPython -m unittest discover -s backend/tests
 ```
 
 ## Test Result
@@ -69,7 +70,7 @@ Ran 12 tests in 0.056s
 OK
 ```
 
-![PeopleOps Agent Platform test evidence](test-evidence-2026-06-24.png)
+![PeopleOps Intelligence Agent test evidence](test-evidence-2026-06-24.png)
 
 ## What The Test Suite Covers
 
