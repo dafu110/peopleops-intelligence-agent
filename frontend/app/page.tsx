@@ -71,7 +71,7 @@ const starterMessages: ChatMessage[] = [
   {
     role: "assistant",
     content:
-      "浣犲ソ锛屾垜鏄?PeopleOps Intelligence Assistant銆備綘鍙互涓婁紶绠€鍘嗐€佺矘璐?JD锛屾垨鐩存帴璇㈤棶鍒跺害銆佹姤閿€銆佽€冨嫟銆佺鍒╁拰鍊欓€変汉璺熻繘鍔ㄤ綔銆?,
+      "Hello, I am the PeopleOps Intelligence Assistant. Upload a resume, paste a JD, or ask about policy, reimbursement, attendance, benefits, and candidate follow-up actions.",
   },
 ];
 
@@ -80,14 +80,14 @@ function statusTone(ok?: boolean) {
 }
 
 function readinessLabel(ok?: boolean) {
-  return ok ? "鐢熶骇灏辩华" : "寰呭鏍?;
+  return ok ? "Production ready" : "Needs review";
 }
 
 function auditLabel(ok?: boolean) {
-  return ok ? "瀹¤鏈夋晥" : "寰呮鏌?;
+  return ok ? "Audit valid" : "Needs check";
 }
 
-function shortText(value: string | undefined, fallback = "鏆傛棤") {
+function shortText(value: string | undefined, fallback = "None") {
   if (!value) return fallback;
   return value.length > 72 ? `${value.slice(0, 72)}...` : value;
 }
@@ -106,7 +106,7 @@ function parseJsonSafe(value?: string) {
   }
 }
 
-function previewJson(value: unknown, fallback = "鏆傛棤璇︽儏") {
+function previewJson(value: unknown, fallback = "No details") {
   if (value === null || value === undefined || value === "") return fallback;
   const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
   return text.length > 520 ? `${text.slice(0, 520)}...` : text;
@@ -158,10 +158,10 @@ function inferPageLabel(source: string) {
 
 function evidenceReliability(item: RagEvidence, question: string) {
   const hits = keywordHits(question, item.snippet);
-  if (!item.snippet) return "鏃犵墖娈?;
-  if (hits.length >= 2) return "鍏抽敭璇嶅懡涓?;
-  if (item.source) return "鍙拷婧?;
-  return "寰呭鏍?;
+  if (!item.snippet) return "No excerpt";
+  if (hits.length >= 2) return "Keyword hit";
+  if (item.source) return "Traceable";
+  return "Needs review";
 }
 
 function statusClass(status?: string) {
@@ -175,18 +175,18 @@ function statusClass(status?: string) {
 function statusLabel(status?: string) {
   const normalized = (status || "").toUpperCase();
   const labels: Record<string, string> = {
-    APPROVED: "宸查€氳繃",
-    CANCELLED: "宸插彇娑?,
-    COMPLETED: "宸插畬鎴?,
-    CONFIGURED: "宸查厤缃?,
-    ERROR: "閿欒",
-    FAILED: "澶辫触",
-    PENDING: "寰呭鎵?,
-    READY: "灏辩华",
-    REJECTED: "宸叉嫆缁?,
-    RUNNING: "杩愯涓?,
-    SUCCESS: "鎴愬姛",
-    SUCCEEDED: "鎴愬姛",
+    APPROVED: "Approved",
+    CANCELLED: "Cancelled",
+    COMPLETED: "Completed",
+    CONFIGURED: "Configured",
+    ERROR: "Error",
+    FAILED: "Failed",
+    PENDING: "Pending review",
+    READY: "Ready",
+    REJECTED: "Rejected",
+    RUNNING: "Running",
+    SUCCESS: "Success",
+    SUCCEEDED: "Success",
   };
   return labels[normalized] || status || "--";
 }
@@ -280,7 +280,7 @@ export default function Home() {
       setHealth(healthData);
       setReadiness(readinessData);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "鏃犳硶璇诲彇鍚庣鐘舵€?);
+      setError(err instanceof Error ? err.message : "Unable to read backend status");
     }
 
     try {
@@ -372,7 +372,7 @@ export default function Home() {
         ...current,
         {
           role: "assistant",
-          content: response.reply || "绯荤粺娌℃湁杩斿洖鏈夋晥鍥炲銆?,
+          content: response.reply || "The system did not return a valid response.",
           evidence: response.evidence || [],
         },
       ]);
@@ -385,7 +385,7 @@ export default function Home() {
         ...current,
         {
           role: "assistant",
-          content: "璇锋眰娌℃湁瀹屾垚銆傝妫€鏌ュ悗绔?API銆佽闂彛浠ゆ垨妯″瀷閰嶇疆銆?,
+          content: "The request did not complete. Check the backend API, access password, or model configuration.",
         },
       ]);
     } finally {
@@ -400,7 +400,7 @@ export default function Home() {
       await transitionApproval(approvalId, action, accessPassword);
       await refreshOperationalData(accessPassword);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "瀹℃壒鐘舵€佹洿鏂板け璐?);
+      setError(err instanceof Error ? err.message : "Approval status update failed");
     } finally {
       setPendingApprovalId(null);
     }
@@ -430,49 +430,49 @@ export default function Home() {
         ? "Password"
         : "Local";
   const deploymentChecks = [
-    { label: "妯″瀷閰嶇疆", ok: Boolean(health?.model_configured), value: health?.chat_model || "--" },
-    { label: "韬唤妯″紡", ok: Boolean(health), value: identityMode },
-    { label: "鏁版嵁搴?, ok: health?.database_backend === "sqlite" || Boolean(health?.database_url_configured), value: health?.database_backend || "--" },
-    { label: "鍚戦噺妫€绱?, ok: health?.vector_backend === "chroma" || Boolean(health?.vector_store_url_configured), value: health?.vector_backend || "--" },
-    { label: "瀵硅薄瀛樺偍", ok: Boolean(health?.object_storage_configured) || !readiness?.enterprise_warnings?.some((item) => item.includes("OBJECT_STORAGE_URI")), value: health?.object_storage_configured ? "configured" : "local" },
-    { label: "瀹¤閾?, ok: Boolean(auditValid), value: auditValid ? "valid" : "check" },
+    { label: "Model", ok: Boolean(health?.model_configured), value: health?.chat_model || "--" },
+    { label: "Identity", ok: Boolean(health), value: identityMode },
+    { label: "Database", ok: health?.database_backend === "sqlite" || Boolean(health?.database_url_configured), value: health?.database_backend || "--" },
+    { label: "Vector search", ok: health?.vector_backend === "chroma" || Boolean(health?.vector_store_url_configured), value: health?.vector_backend || "--" },
+    { label: "Object store", ok: Boolean(health?.object_storage_configured) || !readiness?.enterprise_warnings?.some((item) => item.includes("OBJECT_STORAGE_URI")), value: health?.object_storage_configured ? "configured" : "local" },
+    { label: "Audit chain", ok: Boolean(auditValid), value: auditValid ? "valid" : "check" },
   ];
-  const materialStatus = resumeFiles.length ? `${resumeFiles.length} 涓枃浠禶 : resumeText.trim() ? "宸茬矘璐寸畝鍘? : "寰呰ˉ鏉愭枡";
-  const jdStatus = jdText.trim() ? "宀椾綅宸插氨缁? : "寰呰ˉ宀椾綅";
+  const materialStatus = resumeFiles.length ? `${resumeFiles.length} files` : resumeText.trim() ? "Resume pasted" : "Add material";
+  const jdStatus = jdText.trim() ? "Role ready" : "Add job context";
   const inspectorTabs = [
-    { id: "overview" as const, label: "姒傝", icon: ShieldCheck },
-    { id: "trace" as const, label: "杩借釜", icon: GitBranch },
-    { id: "actions" as const, label: "鍔ㄤ綔", icon: Wrench },
-    { id: "audit" as const, label: "瀹¤", icon: Database },
+    { id: "overview" as const, label: "Overview", icon: ShieldCheck },
+    { id: "trace" as const, label: "Trace", icon: GitBranch },
+    { id: "actions" as const, label: "Actions", icon: Wrench },
+    { id: "audit" as const, label: "Audit", icon: Database },
   ];
   const quickPrompts = [
-    "杩欎唤绠€鍘嗗拰 JD 鐨勫尮閰嶅害濡備綍锛?,
-    "鍑哄樊浣忓鎶ラ攢鏍囧噯鏄粈涔堬紵",
-    "甯垜鐢熸垚鍊欓€変汉闈㈣瘯璺熻繘鍔ㄤ綔銆?,
+    "How well does this resume match the JD?",
+    "What is the travel reimbursement policy?",
+    "Generate interview follow-up actions for this candidate.",
   ];
   const overviewSignals = [
-    { label: "鏉愭枡", value: materialStatus, tone: resumeText.trim() || resumeFiles.length ? "ok" : "warn" },
-    { label: "宀椾綅", value: jdStatus, tone: jdText.trim() ? "ok" : "warn" },
-    { label: "寰呭鎵?, value: approvals.filter((item) => item.status === "PENDING").length.toString(), tone: approvals.some((item) => item.status === "PENDING") ? "warn" : "ok" },
-    { label: "瀹¤", value: auditLabel(auditValid), tone: auditValid ? "ok" : "warn" },
+    { label: "Material", value: materialStatus, tone: resumeText.trim() || resumeFiles.length ? "ok" : "warn" },
+    { label: "Role", value: jdStatus, tone: jdText.trim() ? "ok" : "warn" },
+    { label: "Approvals", value: approvals.filter((item) => item.status === "PENDING").length.toString(), tone: approvals.some((item) => item.status === "PENDING") ? "warn" : "ok" },
+    { label: "Audit", value: auditLabel(auditValid), tone: auditValid ? "ok" : "warn" },
   ];
   const workflowSteps = [
     {
       label: "1",
-      title: "鍑嗗鏉愭枡",
+      title: "Prepare material",
       body: materialStatus,
       ok: Boolean(resumeText.trim() || resumeFiles.length),
     },
     {
       label: "2",
-      title: "琛ュ厖宀椾綅",
+      title: "Add role context",
       body: jdStatus,
       ok: Boolean(jdText.trim()),
     },
     {
       label: "3",
-      title: "鐢熸垚鍒ゆ柇涓庡姩浣?,
-      body: lastTaskId ? "宸叉湁浠诲姟鍥炴斁" : "鍙戦€侀棶棰樺悗娌夋穩璇佹嵁",
+      title: "Generate judgment and actions",
+      body: lastTaskId ? "Task replay available" : "Send a question to ground evidence",
       ok: Boolean(lastTaskId),
     },
   ];
@@ -482,101 +482,101 @@ export default function Home() {
   const hasApiIssue = Boolean(error);
   const hasAuthGate = Boolean(health?.access_password_required && !accessPassword);
   const healthBanner = hasApiIssue
-    ? { tone: "danger", title: "鍚庣杩炴帴寮傚父", body: error }
+    ? { tone: "danger", title: "Backend connection issue", body: error }
     : hasAuthGate
-      ? { tone: "warn", title: "闇€瑕佽闂彛浠?, body: "杈撳叆璁块棶鍙ｄ护鍚庢墠鑳藉姞杞藉鎵广€佸璁°€佽繛鎺ュ櫒鍜屽伐鍏锋墽琛岃褰曘€? }
+      ? { tone: "warn", title: "Access password required", body: "Enter the access password to load approvals, audit events, connectors, and tool execution records." }
       : !ready
-        ? { tone: "warn", title: "鐢熶骇灏辩华搴﹀緟澶嶆牳", body: readinessWarnings[0] || "褰撳墠鐜杩樻湁閰嶇疆椤归渶瑕佺‘璁ゃ€? }
+        ? { tone: "warn", title: "Production readiness needs review", body: readinessWarnings[0] || "This environment still has configuration items to confirm." }
         : null;
   const candidateRecords = [
     {
-      name: resumeFiles[0]?.replace(/\.[^.]+$/, "") || (resumeText.trim() ? "褰撳墠鍊欓€変汉" : "寰呭鍏ュ€欓€変汉"),
-      role: jdText.trim() ? "宸插叧鑱斿綋鍓?JD" : "寰呭叧鑱斿矖浣?,
-      stage: lastTaskId ? "宸插垎鏋? : resumeText.trim() || resumeFiles.length ? "寰呭垎鏋? : "寰呭鍏?,
-      fit: lastTaskId ? "宸茬敓鎴愬缓璁? : jdText.trim() && (resumeText.trim() || resumeFiles.length) ? "鍙紑濮嬪尮閰? : "璧勬枡涓嶅畬鏁?,
+      name: resumeFiles[0]?.replace(/\.[^.]+$/, "") || (resumeText.trim() ? "Current candidate" : "Candidate pending import"),
+      role: jdText.trim() ? "Linked to current JD" : "Role pending",
+      stage: lastTaskId ? "Analyzed" : resumeText.trim() || resumeFiles.length ? "Ready to analyze" : "Pending import",
+      fit: lastTaskId ? "Recommendation generated" : jdText.trim() && (resumeText.trim() || resumeFiles.length) ? "Ready to match" : "Incomplete material",
     },
     {
-      name: "閿€鍞繍钀ョ粡鐞嗗€欓€夋睜",
-      role: "绀轰緥闃熷垪",
-      stage: "寰呭鍏?,
-      fit: "杩炴帴 ATS 鍚庡悓姝?,
+      name: "Sales operations manager pool",
+      role: "Sample queue",
+      stage: "Pending import",
+      fit: "Sync after ATS connection",
     },
     {
-      name: "鐮斿彂鏁堣兘鍊欓€夋睜",
-      role: "绀轰緥闃熷垪",
-      stage: "寰呭鍏?,
-      fit: "杩炴帴 ATS 鍚庡悓姝?,
+      name: "Engineering productivity pool",
+      role: "Sample queue",
+      stage: "Pending import",
+      fit: "Sync after ATS connection",
     },
   ];
   const navigationItems = [
-    { id: "workspace" as const, label: "宸ヤ綔鍙?, value: "Agent 涓灑", icon: Layers3 },
-    { id: "candidates" as const, label: "鍊欓€変汉", value: `${resumeFiles.length || (resumeText.trim() ? 1 : 0)} 浠芥潗鏂檂, icon: Users },
-    { id: "approvals" as const, label: "瀹℃壒", value: `${pendingApprovals.length} 寰呭鐞哷, icon: ClipboardList },
-    { id: "connectors" as const, label: "杩炴帴鍣?, value: connectorSummary(connectors), icon: Plug },
-    { id: "audit" as const, label: "瀹¤", value: auditLabel(auditValid), icon: ShieldCheck },
-    { id: "settings" as const, label: "璁剧疆", value: "閰嶇疆涓績", icon: Settings },
+    { id: "workspace" as const, label: "Workspace", value: "Agent console", icon: Layers3 },
+    { id: "candidates" as const, label: "Candidates", value: `${resumeFiles.length || (resumeText.trim() ? 1 : 0)} materials`, icon: Users },
+    { id: "approvals" as const, label: "Approvals", value: `${pendingApprovals.length} pending`, icon: ClipboardList },
+    { id: "connectors" as const, label: "Connectors", value: connectorSummary(connectors), icon: Plug },
+    { id: "audit" as const, label: "Audit", value: auditLabel(auditValid), icon: ShieldCheck },
+    { id: "settings" as const, label: "Settings", value: "Config center", icon: Settings },
   ];
   const usageItems = [
-    { label: "浠诲姟", value: operations?.task_count ?? tasks.length },
-    { label: "宸ュ叿璋冪敤", value: operations?.tool_execution_count ?? toolExecutions.length },
-    { label: "瀹℃壒", value: approvals.length },
+    { label: "Tasks", value: operations?.task_count ?? tasks.length },
+    { label: "Tool calls", value: operations?.tool_execution_count ?? toolExecutions.length },
+    { label: "Approvals", value: approvals.length },
   ];
   const fallbackProductionChecks: ProductionCheckRecord[] = [
     {
       id: "postgresql",
-      label: "PostgreSQL 瀹炰緥寤哄簱銆佽縼绉汇€佽鍐欏洖鏀?,
+      label: "PostgreSQL instance, migrations, and read/write verification",
       status: health?.database_backend === "postgresql" && health?.database_url_configured ? "configured" : "not_configured",
       verification: "configuration",
       detail: `${health?.database_backend || "--"} / DATABASE_URL=${health?.database_url_configured ? "configured" : "missing"}`,
-      next_step: "杩炴帴鍚庣 /production/checks 鑾峰彇瀹炴満鑱旇皟闂ㄧ銆?,
+      next_step: "Connect the backend /production/checks endpoint for live verification.",
     },
     {
       id: "qdrant",
-      label: "Qdrant 鎴栫敓浜у悜閲忓簱绱㈠紩鍐欏叆/妫€绱?,
+      label: "Qdrant or production vector index write/search",
       status: health?.vector_backend !== "chroma" && health?.vector_store_url_configured ? "configured" : "not_configured",
       verification: "configuration",
       detail: `${health?.vector_backend || "--"} / VECTOR_STORE_URL=${health?.vector_store_url_configured ? "configured" : "missing"}`,
-      next_step: "閰嶇疆鐢熶骇鍚戦噺搴撳悗鎵ц绱㈠紩鍐欏叆銆佹绱㈠拰 RAG eval銆?,
+      next_step: "Configure the production vector store, then run index write, retrieval, and RAG eval checks.",
     },
     {
       id: "object_storage",
-      label: "S3/MinIO 瀵硅薄涓婁紶銆佷笅杞姐€佹潈闄愩€佺敓鍛藉懆鏈?,
+      label: "S3/MinIO object upload, download, permissions, and lifecycle",
       status: health?.object_storage_configured ? "configured" : "not_configured",
       verification: "configuration",
       detail: health?.object_storage_configured ? "OBJECT_STORAGE_URI configured" : "OBJECT_STORAGE_URI missing",
-      next_step: "鎵ц put/get/delete 鍜岀敓鍛藉懆鏈熺瓥鐣ラ獙璇併€?,
+      next_step: "Verify put/get/delete operations and lifecycle policy behavior.",
     },
     {
       id: "oidc",
-      label: "OIDC provider 鐪熷疄 token 鏍￠獙鍜岃鑹叉槧灏?,
+      label: "OIDC provider token validation and role mapping",
       status: health?.oidc_enabled ? "configured" : "not_configured",
       verification: "configuration",
       detail: identityMode,
-      next_step: "浣跨敤鐪熷疄 bearer token 璋冪敤 /me 楠岃瘉瑙掕壊鏄犲皠銆?,
+      next_step: "Call /me with a real bearer token to verify role mapping.",
     },
     {
       id: "external_tools",
-      label: "ATS/鏃ュ巻鐪熷疄 API 鍑瘉銆佸け璐ラ噸璇曘€佸箓绛夈€佽ˉ鍋?,
+      label: "ATS/calendar API credentials, retries, idempotency, and compensation",
       status: connectors.some((item) => item.status === "configured" && ["ats", "calendar", "collaboration"].includes(item.category)) ? "configured" : "not_configured",
       verification: "configuration",
       detail: `${connectorSummary(connectors)} connectors configured`,
-      next_step: "鎵ц娌欑 ATS 闃舵鍙樻洿銆佹棩鍘嗛個璇枫€佸け璐ラ噸璇曞拰琛ュ伩璁板綍楠岃瘉銆?,
+      next_step: "Run sandbox ATS stage changes, calendar invites, retry checks, and compensation evidence.",
     },
     {
       id: "network_ops",
-      label: "鐢熶骇缃戠粶銆乀LS銆丆ORS銆佺綉鍏炽€佹棩蹇?鍛婅閾捐矾",
+      label: "Production network, TLS, CORS, gateway, logs, and alerts",
       status: health?.trusted_sso_enabled || health?.oidc_enabled ? "configured" : "not_configured",
       verification: "configuration",
       detail: `rate limit / identity / gateway readiness`,
-      next_step: "鍦ㄧ敓浜х綉鍏抽獙璇?TLS銆丆ORS銆佽闂棩蹇楀拰鍛婅璺敱銆?,
+      next_step: "Verify TLS, CORS, access logs, and alert routes at the production gateway.",
     },
     {
       id: "e2e_demo",
-      label: "鍏ㄩ摼璺鍒扮婕旂ず鍜屽洖婊氭紨缁?,
+      label: "End-to-end demo and rollback rehearsal",
       status: "configured",
       verification: "runbook",
       detail: "Runbook exists; requires operator evidence.",
-      next_step: "璺戜笂浼犮€侀棶绛斻€佸鎵广€佹墽琛屻€佸璁￠摼鍜屽洖婊氭紨缁冦€?,
+      next_step: "Run upload, Q&A, approval, execution, audit chain, and rollback rehearsal.",
     },
   ];
   const productionReadinessItems = productionChecks?.checks || fallbackProductionChecks;
@@ -599,18 +599,18 @@ export default function Home() {
           </div>
         </div>
 
-        <section className="tenant-card" aria-label="绉熸埛淇℃伅">
+        <section className="tenant-card" aria-label="Tenant information">
           <div className="tenant-mark">
             <Building2 size={17} />
           </div>
           <div>
-            <span>褰撳墠绉熸埛</span>
+            <span>Current tenant</span>
             <strong>{tenantName}</strong>
           </div>
           <em>Pro</em>
         </section>
 
-        <nav className="side-nav" aria-label="浜у搧瀵艰埅">
+        <nav className="side-nav" aria-label="Product navigation">
           {navigationItems.map((item) => {
             const Icon = item.icon;
             return (
@@ -632,26 +632,26 @@ export default function Home() {
         <section className="panel-section">
           <div className="section-title">
             <BriefcaseBusiness size={16} />
-            鍊欓€変汉涓庡矖浣嶄笂涓嬫枃
+            Candidate and role context
           </div>
           <label className="file-drop">
             <Upload size={18} />
-            <span>{isExtracting ? "姝ｅ湪瑙ｆ瀽鏂囨。" : "涓婁紶绠€鍘嗘垨鏉愭枡"}</span>
+            <span>{isExtracting ? "Parsing document" : "Upload resume or material"}</span>
             <input multiple type="file" accept=".pdf,.docx,.txt,.md,.markdown" onChange={handleFiles} />
           </label>
           <div className="file-list">
-            {resumeFiles.length ? resumeFiles.map((name) => <span key={name}>{name}</span>) : "鏀寔 PDF銆丏OCX銆乀XT銆丮D锛屼笂浼犲悗浼氳皟鐢ㄥ悗绔В鏋愭枃鏈€?}
+            {resumeFiles.length ? resumeFiles.map((name) => <span key={name}>{name}</span>) : "Supports PDF, DOCX, TXT, and MD. Uploads are parsed by the backend."}
           </div>
           <textarea
             value={resumeText}
             onChange={(event) => setResumeText(event.target.value)}
-            placeholder="鍊欓€変汉绠€鍘嗐€侀潰璇曡褰曟垨鍏抽敭鎽樿浼氬嚭鐜板湪杩欓噷銆?
+            placeholder="Candidate resume, interview notes, or key summaries appear here."
             rows={7}
           />
           <textarea
             value={jdText}
             onChange={(event) => setJdText(event.target.value)}
-            placeholder="绮樿创宀椾綅 JD銆佽兘鍔涜姹傘€佸勾闄愯姹傘€?
+            placeholder="Paste the job description, capability requirements, and seniority expectations."
             rows={7}
           />
         </section>
@@ -659,25 +659,26 @@ export default function Home() {
         <section className="panel-section compact">
           <div className="section-title">
             <LockKeyhole size={16} />
-            璁块棶涓庡悗绔?          </div>
+            Access and backend
+          </div>
           <form className="access-form" onSubmit={(event) => event.preventDefault()}>
             <input
-              aria-label="璁块棶鍙ｄ护"
+              aria-label="Access password"
               autoComplete="current-password"
               value={accessPassword}
               onChange={(event) => setAccessPassword(event.target.value)}
               onBlur={(event) => refreshOperationalData(event.currentTarget.value)}
               type="password"
-              placeholder="濡傛灉鍚敤 ACCESS_PASSWORD锛屽湪杩欓噷杈撳叆"
+              placeholder="Access password"
             />
           </form>
           <p className="subtle">API: {API_BASE}</p>
         </section>
 
-        <section className="usage-card" aria-label="鏈湀鐢ㄩ噺">
+        <section className="usage-card" aria-label="Monthly usage">
           <div className="section-title">
             <BarChart3 size={16} />
-            鏈湀鐢ㄩ噺
+            Monthly usage
           </div>
           <div className="usage-grid">
             {usageItems.map((item) => (
@@ -695,14 +696,14 @@ export default function Home() {
           <div>
             <p className="eyebrow">HRBP Operations Console</p>
             <h2>{health?.app_name || "PeopleOps Intelligence Agent"}</h2>
-            <p>闈㈠悜澶氱鎴?PeopleOps 鍥㈤槦鐨?AI 宸ヤ綔鍙帮細闆嗕腑澶勭悊鏀跨瓥闂瓟銆佺畝鍘嗗尮閰嶃€佸€欓€変汉璺熻繘銆佸鎵瑰拰瀹¤杩借釜銆?/p>
+            <p>AI workbench for multi-tenant PeopleOps teams: policy Q&A, resume matching, candidate follow-up, approvals, and audit traceability.</p>
           </div>
           <div className="header-ops">
-            <div className="workspace-actions" aria-label="宸ヤ綔鍖哄姩浣?>
-              <button type="button" title="閫氱煡">
+            <div className="workspace-actions" aria-label="Workspace actions">
+              <button type="button" title="Notifications">
                 <AlertTriangle size={15} />
               </button>
-              <button type="button" title="璁剧疆">
+              <button type="button" title="Settings">
                 <Settings size={15} />
               </button>
             </div>
@@ -744,7 +745,7 @@ export default function Home() {
           ))}
         </section>
 
-        <section className="workflow-strip" aria-label="棣栨浣跨敤娴佺▼">
+        <section className="workflow-strip" aria-label="First-use workflow">
           {workflowSteps.map((step) => (
             <div className={step.ok ? "workflow-step done" : "workflow-step"} key={step.label}>
               <span>{step.label}</span>
@@ -766,16 +767,16 @@ export default function Home() {
         <section className="mobile-material-card">
           <div>
             <p className="eyebrow">Candidate Context</p>
-            <h3>鍊欓€変汉鏉愭枡</h3>
+            <h3>Candidate material</h3>
           </div>
           <div className="mobile-material-actions">
             <label className="file-drop compact-drop">
               <Upload size={16} />
-              <span>{isExtracting ? "瑙ｆ瀽涓? : "涓婁紶"}</span>
+              <span>{isExtracting ? "Parsing" : "Upload"}</span>
               <input multiple type="file" accept=".pdf,.docx,.txt,.md,.markdown" onChange={handleFiles} />
             </label>
             <a className="link-button" href="#candidate-context">
-              缂栬緫鏉愭枡
+              Edit material
             </a>
           </div>
           <div className="material-chips">
@@ -791,7 +792,7 @@ export default function Home() {
               <h3>PeopleOps Intelligence Assistant</h3>
             </div>
             <div className="session-meta">
-              <span>{lastTaskId || threadId || "鏂颁細璇?}</span>
+              <span>{lastTaskId || threadId || "New session"}</span>
               <strong>{tenantName}</strong>
             </div>
           </div>
@@ -810,13 +811,13 @@ export default function Home() {
                 <div className="message-avatar">
                   <Bot size={16} />
                 </div>
-                <p className="typing-state">姝ｅ湪妫€绱㈠埗搴︺€佸€欓€変汉涓婁笅鏂囧拰鍙墽琛屽姩浣?..</p>
+                <p className="typing-state">Retrieving policy, candidate context, and executable actions...</p>
               </article>
             ) : null}
           </div>
 
           <form className="composer" onSubmit={handleSubmit}>
-            <div className="prompt-rail" aria-label="蹇嵎闂">
+            <div className="prompt-rail" aria-label="Quick questions">
               {quickPrompts.map((item) => (
                 <button key={item} type="button" onClick={() => setPrompt(item)}>
                   {item}
@@ -826,12 +827,12 @@ export default function Home() {
             <textarea
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
-              placeholder="渚嬪锛氬嚭宸綇瀹挎姤閿€鏍囧噯鏄粈涔堬紵杩欎唤绠€鍘嗗拰 JD 鏄惁鍖归厤锛熷府鎴戝畨鎺掑€欓€変汉鏄庡ぉ涓嬪崍闈㈣瘯銆?
+              placeholder="For example: What is the lodging reimbursement standard? Does this resume match the JD? Help schedule a candidate interview tomorrow afternoon."
               rows={3}
             />
             <button type="submit" disabled={isSending || !prompt.trim()}>
               <Send size={16} />
-              {isSending ? "澶勭悊涓? : "鍙戦€?}
+              {isSending ? "Processing" : "Send"}
             </button>
           </form>
         </section>
@@ -843,33 +844,33 @@ export default function Home() {
             <div className="module-head">
               <div>
                 <p className="eyebrow">Candidate CRM</p>
-                <h3>鍊欓€変汉妗堜欢</h3>
-                <p>缁熶竴鏌ョ湅鍊欓€変汉鏉愭枡銆佸矖浣嶅叧鑱斻€佸尮閰嶇姸鎬佸拰涓嬩竴姝ュ姩浣溿€?/p>
+                <h3>Candidate records</h3>
+                <p>Review candidate material, role linkage, match status, and next actions in one place.</p>
               </div>
               <label className="module-action">
                 <Upload size={15} />
-                瀵煎叆鏉愭枡
+                Import material
                 <input multiple type="file" accept=".pdf,.docx,.txt,.md,.markdown" onChange={handleFiles} />
               </label>
             </div>
             <div className="data-table candidate-table">
               <div className="table-row table-head">
-                <span>鍊欓€変汉/闃熷垪</span>
-                <span>宀椾綅</span>
-                <span>闃舵</span>
-                <span>鍖归厤鐘舵€?/span>
+                <span>Candidate / Queue</span>
+                <span>Role</span>
+                <span>Stage</span>
+                <span>Match status</span>
               </div>
               {candidateRecords.map((candidate) => (
                 <button className="table-row" key={candidate.name} type="button" onClick={() => setActiveProductView("workspace")}>
                   <strong>{candidate.name}</strong>
                   <span>{candidate.role}</span>
-                  <span className={`state-chip ${candidate.stage === "宸插垎鏋? ? "ok" : "warn"}`}>{candidate.stage}</span>
+                  <span className={`state-chip ${candidate.stage === "Analyzed" ? "ok" : "warn"}`}>{candidate.stage}</span>
                   <span>{candidate.fit}</span>
                 </button>
               ))}
             </div>
             {!resumeText.trim() && !resumeFiles.length ? (
-              <EmptyState icon={Users} tone="warn" title="杩樻病鏈夌湡瀹炲€欓€変汉鏉愭枡" body="瀵煎叆绠€鍘嗘垨杩炴帴 ATS 鍚庯紝杩欓噷浼氬睍绀虹湡瀹炲€欓€変汉闃熷垪銆? />
+              <EmptyState icon={Users} tone="warn" title="No real candidate material yet" body="Import a resume or connect ATS to show a real candidate queue here." />
             ) : null}
           </section>
         ) : null}
@@ -879,13 +880,13 @@ export default function Home() {
             <div className="module-head">
               <div>
                 <p className="eyebrow">Approval Center</p>
-                <h3>瀹℃壒涓績</h3>
-                <p>闆嗕腑澶勭悊 Agent 鐢熸垚鐨勫閮ㄥ姩浣溿€佹墽琛屾巿鏉冨拰鍙ˉ鍋挎搷浣溿€?/p>
+                <h3>Approval center</h3>
+                <p>Review external actions generated by the agent, execution permissions, and compensating operations.</p>
               </div>
               <div className="segmented-summary">
-                <span>{pendingApprovals.length} 寰呭鎵?/span>
-                <span>{approvals.filter((item) => item.status === "APPROVED").length} 宸查€氳繃</span>
-                <span>{approvals.filter((item) => item.status === "REJECTED").length} 宸叉嫆缁?/span>
+                <span>{pendingApprovals.length} pending</span>
+                <span>{approvals.filter((item) => item.status === "APPROVED").length} approved</span>
+                <span>{approvals.filter((item) => item.status === "REJECTED").length} rejected</span>
               </div>
             </div>
             <div className="approval-board">
@@ -893,25 +894,25 @@ export default function Home() {
                 <article className="approval-item" key={`${item.id}-${item.status}`}>
                   <div>
                     <span className={`state-chip ${statusClass(item.status)}`}>{statusLabel(item.status)}</span>
-                    <strong>{shortText(item.candidate_name || item.action_type || item.subject_ref, "鍊欓€変汉鍔ㄤ綔")}</strong>
-                    <p>{item.interview_time ? `闈㈣瘯鏃堕棿锛?{formatDateTime(item.interview_time)}` : "绛夊緟 HRBP 瀹℃牳鍚庢墽琛屻€?}</p>
+                    <strong>{shortText(item.candidate_name || item.action_type || item.subject_ref, "Candidate action")}</strong>
+                    <p>{item.interview_time ? `Interview time: ${formatDateTime(item.interview_time)}` : "Waiting for HRBP review before execution."}</p>
                   </div>
                   {item.action_type && item.status === "PENDING" ? (
                     <div className="row-actions">
                       <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "approve")}>
                         <Check size={13} />
-                        閫氳繃
+                        Approve
                       </button>
                       <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "reject")}>
                         <X size={13} />
-                        鎷掔粷
+                        Reject
                       </button>
                     </div>
                   ) : null}
                 </article>
               ))}
               {!approvals.length && !interviews.length ? (
-                <EmptyState icon={ClipboardList} title="鏆傛棤瀹℃壒椤? body="褰?Agent 闇€瑕佸彂閫侀偖浠躲€佸畨鎺掗潰璇曟垨璋冪敤澶栭儴绯荤粺鏃讹紝浼氳繘鍏ュ鎵逛腑蹇冦€? />
+                <EmptyState icon={ClipboardList} title="No approval items" body="When the agent needs to send email, schedule interviews, or call external systems, items appear here." />
               ) : null}
             </div>
           </section>
@@ -922,10 +923,10 @@ export default function Home() {
             <div className="module-head">
               <div>
                 <p className="eyebrow">Integration Hub</p>
-                <h3>杩炴帴鍣ㄤ笌宸ュ叿</h3>
-                <p>绠＄悊 ATS銆佹棩鍘嗐€侀偖浠躲€佸悜閲忓簱鍜屽璞″瓨鍌ㄧ瓑浼佷笟绯荤粺鎺ュ叆鐘舵€併€?/p>
+                <h3>Connectors and tools</h3>
+                <p>Manage enterprise system connections for ATS, calendar, email, vector stores, and object storage.</p>
               </div>
-              <span className="module-badge">{connectorSummary(connectors)} 宸查厤缃?/span>
+              <span className="module-badge">{connectorSummary(connectors)} configured</span>
             </div>
             <div className="connector-grid">
               {connectors.map((connector) => (
@@ -945,9 +946,9 @@ export default function Home() {
                       <Plug size={16} />
                       <div>
                         <strong>{name}</strong>
-                        <p>杈撳叆鍙ｄ护鎴栭厤缃幆澧冨彉閲忓悗鍚屾</p>
+                        <p>Sync after entering the access password or configuring environment variables.</p>
                       </div>
-                      <span className="state-chip neutral">寰呴厤缃?/span>
+                      <span className="state-chip neutral">Pending config</span>
                     </article>
                   ))}
                 </>
@@ -956,15 +957,16 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <Wrench size={16} />
-                宸ュ叿娉ㄥ唽琛?              </div>
+                Tool registry
+              </div>
               <div className="compact-list">
                 {tools.slice(0, 8).map((tool) => (
                   <div key={tool.name}>
                     <strong>{tool.name}</strong>
-                    <span>{tool.compensatable ? "鍙ˉ鍋? : "鏃犺ˉ鍋?}</span>
+                    <span>{tool.compensatable ? "Compensatable" : "No compensation"}</span>
                   </div>
                 ))}
-                {!tools.length ? <EmptyState icon={Wrench} title="宸ュ叿鐩綍涓嶅彲瑙? body="杈撳叆璁块棶鍙ｄ护鍚庡彲璇诲彇宸ュ叿 registry銆? /> : null}
+                {!tools.length ? <EmptyState icon={Wrench} title="Tool catalog unavailable" body="Enter the access password to read the tool registry." /> : null}
               </div>
             </section>
           </section>
@@ -975,8 +977,8 @@ export default function Home() {
             <div className="module-head">
               <div>
                 <p className="eyebrow">Governance</p>
-                <h3>瀹¤涓庡悎瑙?/h3>
-                <p>鏌ョ湅浠诲姟銆佸伐鍏疯皟鐢ㄣ€佸鎵瑰姩浣滃拰瀹¤閾惧畬鏁存€с€?/p>
+                <h3>Audit and compliance</h3>
+                <p>Inspect tasks, tool calls, approval actions, and audit-chain integrity.</p>
               </div>
               <span className={`module-badge ${auditValid ? "ok" : "warn"}`}>{auditLabel(auditValid)}</span>
             </div>
@@ -984,7 +986,7 @@ export default function Home() {
               <section className="panel-card">
                 <div className="section-title">
                   <Database size={16} />
-                  瀹¤浜嬩欢
+                  Audit events
                 </div>
                 <div className="timeline">
                   {auditEvents.slice(0, 10).map((event, index) => (
@@ -993,13 +995,14 @@ export default function Home() {
                       <p>{shortText(event.timestamp, "local")}</p>
                     </div>
                   ))}
-                  {!auditEvents.length ? <EmptyState icon={Database} title="鏆傛棤瀹¤浜嬩欢" body="杈撳叆璁块棶鍙ｄ护鍚庡彲鏌ョ湅褰撳墠绉熸埛鐨勫璁′簨浠躲€? /> : null}
+                  {!auditEvents.length ? <EmptyState icon={Database} title="No audit events" body="Enter the access password to view audit events for the current tenant." /> : null}
                 </div>
               </section>
               <section className="panel-card">
                 <div className="section-title">
                   <ShieldCheck size={16} />
-                  鍚堣妫€鏌?                </div>
+                  Compliance checks
+                </div>
                 <div className="check-list">
                   {deploymentChecks.map((item) => (
                     <div key={item.label}>
@@ -1018,16 +1021,16 @@ export default function Home() {
             <div className="module-head">
               <div>
                 <p className="eyebrow">Admin Settings</p>
-                <h3>璁剧疆涓庡彂甯冩鏌?/h3>
-                <p>闆嗕腑纭 API銆侀壌鏉冦€佹ā鍨嬨€佸伐鍏锋墽琛屾ā寮忓拰浠撳簱鍙戝竷鐘舵€併€?/p>
+                <h3>Settings and release checks</h3>
+                <p>Confirm API, authorization, model, tool execution mode, and repository release status.</p>
               </div>
-              <span className="module-badge">绉熸埛 {tenantName}</span>
+              <span className="module-badge">Tenant {tenantName}</span>
             </div>
             <div className="settings-grid">
               <section className="panel-card">
                 <div className="section-title">
                   <Settings size={16} />
-                  杩愯閰嶇疆
+                  Runtime configuration
                 </div>
                 <dl className="fact-list">
                   <div>
@@ -1035,15 +1038,15 @@ export default function Home() {
                     <dd>{API_BASE}</dd>
                   </div>
                   <div>
-                    <dt>韬唤妯″紡</dt>
+                    <dt>Identity mode</dt>
                     <dd>{identityMode}</dd>
                   </div>
                   <div>
-                    <dt>妯″瀷</dt>
+                    <dt>Model</dt>
                     <dd>{health?.chat_model || "--"}</dd>
                   </div>
                   <div>
-                    <dt>宸ュ叿妯″紡</dt>
+                    <dt>Tool mode</dt>
                     <dd>{health?.tool_execution_mode || "--"}</dd>
                   </div>
                 </dl>
@@ -1051,9 +1054,10 @@ export default function Home() {
               <section className="panel-card">
                 <div className="section-title">
                   <GitBranch size={16} />
-                  鍙戝竷鍓?Git 妫€鏌?                </div>
+                  Pre-release Git checks
+                </div>
                 <div className="release-checklist">
-                  <p>褰撳墠浠撳簱瀛樺湪缁撴瀯杩佺Щ鐥曡抗锛氭棫鏍圭洰褰曟枃浠跺垹闄わ紝鏂?`backend/`銆乣frontend/`銆乣infra/` 鐩綍灏氶渶纭鍚庡啀缁熶竴 stage銆?/p>
+                  <p>The current repository includes a structure migration: old root files were removed and new `backend/`, `frontend/`, and `infra/` folders should be reviewed before staging.</p>
                   <code>git status --short</code>
                   <code>git diff --stat</code>
                 </div>
@@ -1061,9 +1065,9 @@ export default function Home() {
               <section className="panel-card production-card">
                 <div className="section-title">
                   <ShieldCheck size={16} />
-                  瀹炴満鑱旇皟闂ㄧ
+                  Live integration gates
                   <span className="inline-loading">
-                    楠岃瘉閫氳繃 {productionCheckSummary.verified} 路 寰呴獙璇?{productionCheckSummary.configured} 路 澶辫触 {productionCheckSummary.failed}
+                    Verified {productionCheckSummary.verified} | Pending {productionCheckSummary.configured} | Failed {productionCheckSummary.failed}
                   </span>
                 </div>
                 <div className="readiness-matrix">
@@ -1071,17 +1075,17 @@ export default function Home() {
                     <article className={item.status} key={item.id}>
                       <span className={`state-chip ${item.status === "verified" ? "ok" : item.status === "failed" ? "danger" : "warn"}`}>
                         {item.status === "verified"
-                          ? "瀹炴満閫氳繃"
+                          ? "Verified"
                           : item.status === "configured"
-                            ? "宸查厤缃緟楠岃瘉"
+                            ? "Configured"
                             : item.status === "failed"
-                              ? "楠岃瘉澶辫触"
-                              : "鏈厤缃?}
+                              ? "Failed"
+                              : "Not configured"}
                       </span>
                       <div>
                         <strong>{item.label}</strong>
                         <p>{item.detail}</p>
-                        <em>{item.verification}{item.latency_ms ? ` 路 ${item.latency_ms}ms` : ""}</em>
+                        <em>{item.verification}{item.latency_ms ? ` | ${item.latency_ms}ms` : ""}</em>
                         <p className="next-step">{item.next_step}</p>
                       </div>
                     </article>
@@ -1091,19 +1095,20 @@ export default function Home() {
               <section className="panel-card">
                 <div className="section-title">
                   <Activity size={16} />
-                  瑙傛祴鎬ф憳瑕?                </div>
+                  Observability summary
+                </div>
                 <div className="ops-summary">
                   <div>
                     <strong>{operations ? `${Math.round(operations.task_success_rate * 100)}%` : "--"}</strong>
-                    <span>浠诲姟鎴愬姛鐜?/span>
+                    <span>Task success rate</span>
                   </div>
                   <div>
                     <strong>{failedToolCount}</strong>
-                    <span>宸ュ叿澶辫触</span>
+                    <span>Tool failures</span>
                   </div>
                   <div>
                     <strong>{readinessWarnings.length}</strong>
-                    <span>涓婄嚎鍛婅</span>
+                    <span>Launch warnings</span>
                   </div>
                 </div>
               </section>
@@ -1113,7 +1118,7 @@ export default function Home() {
       </section>
 
       <aside className="evidence-panel">
-        <div className="inspector-tabs" role="tablist" aria-label="杩愯渚ф爮">
+        <div className="inspector-tabs" role="tablist" aria-label="Runtime sidebar">
           {inspectorTabs.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -1138,19 +1143,19 @@ export default function Home() {
               <section className="panel-card attention-card">
                 <div className="section-title">
                   <AlertTriangle size={16} />
-                  浼樺厛澶勭悊
+                  Priority actions
                 </div>
                 <div className="priority-list">
                   {pendingApprovals.length ? (
                     <button type="button" onClick={() => setActiveInspector("actions")}>
-                      <span className="state-chip warn">寰呭鎵?/span>
-                      <p>{pendingApprovals.length} 涓姩浣滈渶瑕佺‘璁?/p>
+                      <span className="state-chip warn">Pending review</span>
+                      <p>{pendingApprovals.length} actions need confirmation</p>
                     </button>
                   ) : null}
                   {failedToolCount ? (
                     <button type="button" onClick={() => setActiveInspector("actions")}>
-                      <span className="state-chip danger">宸ュ叿澶辫触</span>
-                      <p>{failedToolCount} 娆℃墽琛屽け璐ワ紝寤鸿澶嶆牳杩炴帴鍣ㄦ垨鍙傛暟</p>
+                      <span className="state-chip danger">Tool failures</span>
+                      <p>{failedToolCount} executions failed. Review connector settings or parameters.</p>
                     </button>
                   ) : null}
                 </div>
@@ -1160,48 +1165,49 @@ export default function Home() {
             <section className="panel-card priority-card">
               <div className="section-title">
                 <ShieldCheck size={16} />
-                杩愯鐘舵€?                {isRefreshingOps ? <span className="inline-loading">鍒锋柊涓?/span> : null}
+                Runtime status
+                {isRefreshingOps ? <span className="inline-loading">Refreshing</span> : null}
               </div>
               <div className="metric-grid">
                 <div>
                   <strong>{score ?? "--"}</strong>
-                  <span>灏辩华鍒?/span>
+                  <span>Readiness score</span>
                 </div>
                 <div>
                   <strong>{operations?.task_count ?? tasks.length}</strong>
-                  <span>浠诲姟鏁?/span>
+                  <span>Tasks</span>
                 </div>
                 <div>
                   <strong>{connectorSummary(connectors)}</strong>
-                  <span>杩炴帴鍣?/span>
+                  <span>Connectors</span>
                 </div>
               </div>
               <dl className="fact-list">
                 <div>
-                  <dt>宸ュ叿妯″紡</dt>
+                  <dt>Tool mode</dt>
                   <dd>{health?.tool_execution_mode || "--"}</dd>
                 </div>
                 <div>
-                  <dt>鏁版嵁搴?/dt>
+                  <dt>Database</dt>
                   <dd>{health?.database_backend || "--"}</dd>
                 </div>
                 <div>
-                  <dt>鍚戦噺搴?/dt>
+                  <dt>Vector store</dt>
                   <dd>{health?.vector_backend || "--"}</dd>
                 </div>
               </dl>
               <div className="ops-summary">
                 <div>
                   <strong>{operations ? `${Math.round(operations.task_success_rate * 100)}%` : "--"}</strong>
-                  <span>浠诲姟鎴愬姛鐜?/span>
+                  <span>Task success rate</span>
                 </div>
                 <div>
                   <strong>{operations?.tool_execution_count ?? toolExecutions.length}</strong>
-                  <span>宸ュ叿鎵ц</span>
+                  <span>Tool executions</span>
                 </div>
                 <div>
                   <strong>{operations?.tool_status_counts?.FAILED ?? 0}</strong>
-                  <span>宸ュ叿澶辫触</span>
+                  <span>Tool failures</span>
                 </div>
               </div>
             </section>
@@ -1209,7 +1215,8 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <AlertTriangle size={16} />
-                涓婄嚎妫€鏌?              </div>
+                Launch checks
+              </div>
               <div className="check-list">
                 {deploymentChecks.map((item) => (
                   <div key={item.label}>
@@ -1225,7 +1232,7 @@ export default function Home() {
                   ))}
                 </div>
               ) : (
-                <EmptyState icon={ShieldCheck} tone="ok" title="涓婄嚎妫€鏌ラ€氳繃" body="褰撳墠杩愯閰嶇疆娌℃湁闃诲鎬у氨缁憡璀︺€? />
+                <EmptyState icon={ShieldCheck} tone="ok" title="Launch checks passed" body="The current runtime configuration has no blocking readiness warnings." />
               )}
             </section>
           </>
@@ -1236,12 +1243,12 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <FileText size={16} />
-                寮曠敤涓庝笂涓嬫枃
+                Citations and context
               </div>
               <div className="evidence-note">
                 {latestUserQuestion
-                  ? `鏈€杩戦棶棰橈細${shortText(latestUserQuestion)}`
-                  : "鎻愪氦涓诲璇濆悗锛岃繖閲屽睍绀烘渶杩戦棶棰樺拰鍏宠仈璇佹嵁銆?}
+                  ? `Latest question: ${shortText(latestUserQuestion)}`
+                  : "Submit a conversation to show the latest question and supporting evidence here."}
               </div>
               <div className="citation-list">
                 {latestAssistantEvidence.slice(0, 4).map((item, index) => (
@@ -1250,7 +1257,7 @@ export default function Home() {
                       <strong>{item.source}</strong>
                       <span>{inferPageLabel(item.source)}</span>
                     </div>
-                    <p>{shortText(item.snippet, "鏆傛棤寮曠敤鐗囨")}</p>
+                    <p>{shortText(item.snippet, "No citation excerpt")}</p>
                     <div className="evidence-meta">
                       <span className={`state-chip ${keywordHits(latestUserQuestion, item.snippet).length ? "ok" : "neutral"}`}>
                         <SearchCheck size={12} />
@@ -1263,7 +1270,7 @@ export default function Home() {
                   </div>
                 ))}
                 {!latestAssistantEvidence.length ? (
-                  <EmptyState icon={FileText} title="绛夊緟璇佹嵁" body="鍙戦€佷竴娆℃斂绛栭棶绛斿悗锛岃繖閲屼細灞曠ず鏉ユ簮銆佺墖娈点€侀〉鐮佸拰鍏抽敭璇嶅懡涓€? />
+                  <EmptyState icon={FileText} title="Waiting for evidence" body="After a policy Q&A request, sources, excerpts, pages, and keyword hits appear here." />
                 ) : null}
               </div>
             </section>
@@ -1271,22 +1278,22 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <GitBranch size={16} />
-                浠诲姟鍥炴斁
+                Task replay
               </div>
               <div className="timeline">
                 {tasks.slice(0, 5).map((task) => (
                   <button className="timeline-button" type="button" key={task.task_id} onClick={() => selectTask(task.task_id)} disabled={loadingTaskId === task.task_id}>
-                    <span>{loadingTaskId === task.task_id ? "璇诲彇涓? : statusLabel(task.status)}</span>
+                    <span>{loadingTaskId === task.task_id ? "Loading" : statusLabel(task.status)}</span>
                     <p>{shortText(task.input_text)}</p>
                   </button>
                 ))}
-                {!tasks.length ? <EmptyState icon={GitBranch} title="鏆傛棤浠诲姟鍥炴斁" body="鍙戦€佷竴娆?Agent 璇锋眰鍚庝細鍑虹幇浠诲姟璁板綍鍜屼簨浠舵椂闂寸嚎銆? /> : null}
+                {!tasks.length ? <EmptyState icon={GitBranch} title="No task replay" body="Send an agent request to create task records and an event timeline." /> : null}
               </div>
               {selectedTask ? (
                 <div className="event-list">
                   <div className="trace-summary">
                     <div>
-                      <span>浠诲姟</span>
+                      <span>Task</span>
                       <strong>{statusLabel(selectedTask.status)}</strong>
                     </div>
                     <div>
@@ -1318,7 +1325,8 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <ClipboardList size={16} />
-                鍔ㄤ綔涓庡鎵?              </div>
+                Actions and approvals
+              </div>
               <div className="timeline">
                 {[...approvals, ...interviews].slice(0, 6).map((item) => (
                   <div className="timeline-row" key={`${item.id}-${item.status}`}>
@@ -1329,11 +1337,11 @@ export default function Home() {
                         <div className="row-actions">
                           <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "approve")}>
                             <Check size={13} />
-                            {pendingApprovalId === item.id ? "鎻愪氦涓? : "閫氳繃"}
+                            {pendingApprovalId === item.id ? "Submitting" : "Approve"}
                           </button>
                           <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "reject")}>
                             <X size={13} />
-                            鎷掔粷
+                            Reject
                           </button>
                         </div>
                       ) : null}
@@ -1341,7 +1349,7 @@ export default function Home() {
                         <div className="row-actions">
                           <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "execute")}>
                             <Play size={13} />
-                            {pendingApprovalId === item.id ? "鎵ц涓? : "鎵ц"}
+                            {pendingApprovalId === item.id ? "Executing" : "Execute"}
                           </button>
                         </div>
                       ) : null}
@@ -1349,7 +1357,7 @@ export default function Home() {
                   </div>
                 ))}
                 {!approvals.length && !interviews.length ? (
-                  <EmptyState icon={ClipboardList} title="鏆傛棤鍔ㄤ綔璁板綍" body="褰?Agent 鐢熸垚闈㈣瘯瀹夋帓銆佸鎵规垨琛ュ伩鍔ㄤ綔鍚庯紝浼氬湪杩欓噷鍑虹幇銆? />
+                  <EmptyState icon={ClipboardList} title="No action records" body="Interview scheduling, approvals, or compensating actions generated by the agent appear here." />
                 ) : null}
               </div>
             </section>
@@ -1357,23 +1365,24 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <Wrench size={16} />
-                宸ュ叿鐩綍
+                Tool catalog
               </div>
               <div className="compact-list">
                 {tools.slice(0, 5).map((tool) => (
                   <div key={tool.name}>
                     <strong>{tool.name}</strong>
-                    <span>{tool.compensatable ? "鍙ˉ鍋? : "鏃犺ˉ鍋?}</span>
+                    <span>{tool.compensatable ? "Compensatable" : "No compensation"}</span>
                   </div>
                 ))}
-                {!tools.length ? <EmptyState icon={Wrench} title="宸ュ叿鐩綍涓嶅彲瑙? body="杈撳叆璁块棶鍙ｄ护鍚庡彲璇诲彇宸ュ叿 registry锛屾垨纭鍚庣宸插惎鍔ㄣ€? /> : null}
+                {!tools.length ? <EmptyState icon={Wrench} title="Tool catalog unavailable" body="Enter the access password to read the tool registry, or confirm the backend is running." /> : null}
               </div>
             </section>
 
             <section className="panel-card">
               <div className="section-title">
                 <Activity size={16} />
-                鏈€杩戝伐鍏锋墽琛?              </div>
+                Recent tool executions
+              </div>
               <div className="timeline">
                 {toolExecutions.slice(0, 6).map((execution) => (
                   <button
@@ -1386,12 +1395,12 @@ export default function Home() {
                     <div>
                       <p>{execution.tool_name}</p>
                       <p className="subtle">
-                        灏濊瘯 {execution.attempts} 娆?路 {shortText(execution.idempotency_key, "鏃犲箓绛夐敭")}
+                        Attempts {execution.attempts} | {shortText(execution.idempotency_key, "No idempotency key")}
                       </p>
                     </div>
                   </button>
                 ))}
-                {!toolExecutions.length ? <EmptyState icon={Activity} title="鏆傛棤宸ュ叿鎵ц" body="瑙﹀彂涓€娆″€欓€変汉璺熻繘鍔ㄤ綔鍚庯紝浼氭樉绀烘墽琛岀姸鎬併€佽€楁椂鍜岃繑鍥炵粨鏋溿€? /> : null}
+                {!toolExecutions.length ? <EmptyState icon={Activity} title="No tool executions" body="Trigger a candidate follow-up action to show execution status, duration, and result here." /> : null}
               </div>
               {selectedToolExecution ? (
                 <div className="tool-detail">
@@ -1402,15 +1411,15 @@ export default function Home() {
                     </div>
                     <div>
                       <RotateCcw size={13} />
-                      <span>{selectedToolExecution.attempts} 娆″皾璇?/span>
+                      <span>{selectedToolExecution.attempts} attempts</span>
                     </div>
                     <div>
                       <Hash size={13} />
-                      <span>{shortText(selectedToolExecution.idempotency_key, "鏃犲箓绛夐敭")}</span>
+                      <span>{shortText(selectedToolExecution.idempotency_key, "No idempotency key")}</span>
                     </div>
                   </div>
                   <div className="json-preview">
-                    <strong>{selectedToolExecution.error_json ? "閿欒璇︽儏" : "杩斿洖缁撴灉"}</strong>
+                    <strong>{selectedToolExecution.error_json ? "Error details" : "Result"}</strong>
                     <pre>{previewJson(parseJsonSafe(selectedToolExecution.error_json || selectedToolExecution.response_json))}</pre>
                   </div>
                 </div>
@@ -1420,7 +1429,8 @@ export default function Home() {
             <section className="panel-card">
               <div className="section-title">
                 <Plug size={16} />
-                杩炴帴鍣?              </div>
+                Connectors
+              </div>
               <div className="compact-list">
                 {connectors.slice(0, 6).map((connector) => (
                   <div key={connector.name}>
@@ -1428,7 +1438,7 @@ export default function Home() {
                     <span>{statusLabel(connector.status)}</span>
                   </div>
                 ))}
-                {!connectors.length ? <EmptyState icon={Plug} title="杩炴帴鍣ㄦ湭璇诲彇" body="闇€瑕佽闂潈闄愬悗鎵嶈兘璇诲彇杩炴帴鍣ㄧ洰褰曪紱鑻ュ凡杈撳叆鍙ｄ护锛岃纭鍚庣鏈嶅姟鍙敤銆? /> : null}
+                {!connectors.length ? <EmptyState icon={Plug} title="Connectors not loaded" body="Connector catalog access requires permission. If the password is set, confirm the backend is available." /> : null}
               </div>
             </section>
           </>
@@ -1438,7 +1448,8 @@ export default function Home() {
           <section className="panel-card">
             <div className="section-title">
               <Database size={16} />
-              瀹¤閾?            </div>
+              Audit chain
+            </div>
             <div className="timeline">
               {auditEvents.slice(0, 6).map((event, index) => (
                 <div className="timeline-row" key={`${event.event_type}-${index}`}>
@@ -1446,7 +1457,7 @@ export default function Home() {
                   <p>{shortText(event.timestamp, "local")}</p>
                 </div>
               ))}
-              {!auditEvents.length ? <EmptyState icon={Database} title="瀹¤浜嬩欢鏈姞杞? body="杈撳叆璁块棶鍙ｄ护鍚庡彲鏌ョ湅瀹¤浜嬩欢锛涙病鏈変簨浠舵椂琛ㄧず褰撳墠绉熸埛鏆傛棤鍙睍绀鸿褰曘€? /> : null}
+              {!auditEvents.length ? <EmptyState icon={Database} title="Audit events not loaded" body="Enter the access password to view audit events. If there are no events, the current tenant has no displayable records yet." /> : null}
             </div>
           </section>
         ) : null}

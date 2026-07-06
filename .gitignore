@@ -12,6 +12,7 @@ __pycache__/
 
 # Frontend build/dependencies
 node_modules/
+.pnpm-store/
 .next/
 dist/
 output/
