@@ -878,8 +878,8 @@ def render_governance_summary(snapshot: dict) -> None:
         <div class="po-panel">
           <div class="po-panel-title">Closure status</div>
           <p class="po-panel-copy">
-            Audit chain: {"valid" if integrity.get("valid") else "needs review"} 路
-            Connectors configured: {len(configured_connectors)}/{len(connectors)} 路
+            Audit chain: {"valid" if integrity.get("valid") else "needs review"} ·
+            Connectors configured: {len(configured_connectors)}/{len(connectors)} ·
             Tool mode: {escape(settings.tool_execution_mode)}
           </p>
         </div>
@@ -898,7 +898,7 @@ def render_connector_panel() -> None:
             f"""
             <div class="po-ledger-row">
               <div class="po-ledger-key">{escape(str(connector["category"]))}</div>
-              <div class="po-ledger-value">{escape(str(connector["name"]))} 路 {escape(str(connector["capability"]))} 路 {escape(detail)}</div>
+              <div class="po-ledger-value">{escape(str(connector["name"]))} · {escape(str(connector["capability"]))} · {escape(detail)}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -917,13 +917,13 @@ def render_activity_panel(snapshot: dict) -> None:
                     f"""
                     <div class="po-ledger-row">
                       <div class="po-ledger-key">#{escape(str(action['id']))}</div>
-                      <div class="po-ledger-value">{escape(str(action['status']))} 路 {escape(str(action['candidate_name']))} 路 {escape(str(action['interview_time']))}</div>
+                      <div class="po-ledger-value">{escape(str(action['status']))} · {escape(str(action['candidate_name']))} · {escape(str(action['interview_time']))}</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
         else:
-            st.markdown('<div class="po-empty">鏆傛棤鎵ц鍔ㄤ綔銆?/div>', unsafe_allow_html=True)
+            st.markdown('<div class="po-empty">暂无执行动作。</div>', unsafe_allow_html=True)
 
     with approval_col:
         st.markdown('<div class="po-section">Approval Queue</div>', unsafe_allow_html=True)
