@@ -16,7 +16,7 @@ Start here if you are reviewing the project for the first time:
 
 The primary product surface is now a Next.js web console backed by the FastAPI control plane. It uses a professional three-panel workbench: context intake on the left, a single Agent conversation workspace in the center, and evidence, approvals, runtime state, and audit signals on the right.
 
-The Streamlit workbench remains available as a local demo/debug surface, but the formal interface should be the web console.
+The screenshot below is a live run of the Next.js web console. The Streamlit workbench remains available only as an optional local demo/debug surface.
 
 ```text
 Assemble context -> Agent judgment -> Execute action -> Governance evidence
@@ -148,7 +148,7 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 | `OPENAI_API_BASE` | empty | OpenAI-compatible base URL |
 | `OPENAI_MODEL` | `deepseek-chat` | Chat model |
 | `EMBEDDING_MODEL` | `BAAI/bge-small-zh-v1.5` | Chinese-friendly embedding model |
-| `HR_POLICY_PDF` | sample PDF under `data/` | Policy knowledge base; `.env.example` points to `data/鍛樺伐鎵嬪唽娴嬭瘯鐗?pdf`. |
+| `HR_POLICY_PDF` | `data/员工手册测试版.pdf` | Policy knowledge base used by the local RAG demo. |
 | `CHROMA_PERSIST_DIR` | `var/chroma/policy` | Persistent vector index |
 | `RAG_MANIFEST_PATH` | `var/chroma/policy/manifest.json` | RAG index manifest |
 | `RAG_CHUNK_SIZE` | `400` | RAG chunk size |
