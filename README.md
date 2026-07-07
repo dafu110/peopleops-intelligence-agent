@@ -22,9 +22,7 @@ The Streamlit workbench remains available as a local demo/debug surface, but the
 Assemble context -> Agent judgment -> Execute action -> Governance evidence
 ```
 
-![Full-page PeopleOps enterprise console overview](docs/screenshots/peopleops-enterprise-console-overview.png)
-
-![Full-page PeopleOps governance evidence console](docs/screenshots/peopleops-enterprise-console-governance.png)
+![PeopleOps Intelligence Console running locally](docs/screenshots/peopleops-intelligence-console.png)
 
 ## Quick Start
 
