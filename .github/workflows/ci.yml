@@ -28,6 +28,8 @@ jobs:
             backend/api.py backend/app.py \
             backend/core/config.py backend/core/auth.py backend/core/database.py backend/core/security.py \
             backend/core/audit.py backend/core/tools.py backend/core/pdf_utils.py backend/core/matcher.py \
+            backend/core/workflow.py backend/core/rag_engine.py backend/core/tenancy.py \
+            backend/core/connectors.py backend/core/ats.py backend/core/production_checks.py \
             backend/scripts/hash_password.py
 
       - name: Run backend unit tests
@@ -47,7 +49,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 10
+          version: 11.7.0
 
       - uses: actions/setup-node@v4
         with:

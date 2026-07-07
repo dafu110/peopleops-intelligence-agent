@@ -2,6 +2,18 @@
 
 PeopleOps Intelligence Agent is an AI-native HRBP workbench for policy Q&A, resume/JD matching, candidate follow-up actions, approvals, audit evidence, and local ATS-style records. It is designed as a practical enterprise-console reference project rather than a single-purpose RAG demo.
 
+[![ci](https://github.com/dafu110/peopleops-intelligence-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/dafu110/peopleops-intelligence-agent/actions/workflows/ci.yml)
+
+It demonstrates a production-shaped AI agent loop for PeopleOps teams: collect HR context, route the request, retrieve grounded policy evidence, run governed candidate actions, and leave auditable traces for review.
+
+## Portfolio Highlights
+
+- **Real operator console**: Next.js workspace with intake, Agent chat, evidence, approvals, audit status, and readiness checks in one screen.
+- **Grounded HR policy RAG**: Chinese policy handbook retrieval with citations, Chroma persistence, manifest invalidation, and CI quality gates.
+- **Agent workflow beyond chat**: LangGraph routing across policy Q&A, resume/JD matching, and governed tool execution.
+- **Enterprise controls**: tenant headers, RBAC, access-password mode, PII redaction, approval gates, API rate limits, and hash-chained audit events.
+- **Deployment path**: Docker Compose assets plus PostgreSQL, Qdrant, object storage, SSO/OIDC, and connector readiness checks for production handoff.
+
 ## Reading Guide
 
 Start here if you are reviewing the project for the first time:
@@ -77,6 +89,13 @@ The product UI intentionally avoids duplicate search boxes: evidence retrieval i
 - Security and governance foundations: access password support, roles, tenant headers, PII redaction, hash-chained audit logs, and audit integrity checks.
 - FastAPI control plane in `backend/api.py` for health, readiness, identity, chat, action records, approvals, connectors, and audit endpoints.
 - Deployment assets: `infra/Dockerfile`, `infra/docker-compose.yml`, `.devcontainer`, and deployment notes under `docs/`.
+
+## Quality Signals
+
+- GitHub Actions runs backend compile checks, unit tests, RAG dataset validation, RAG fixture scoring, frontend install/build, and real retriever evaluation.
+- Agent golden traces cover RAG routing, resume screening, missing-context handling, scheduling, and candidate-stage tool flows.
+- RAG evals require 100% pass rate in CI with keyword coverage, citation correctness, PII leakage, and forbidden-term checks.
+- Production readiness docs cover identity, managed state, object storage, connector configuration, eval reports, and rollback signals.
 
 ## Architecture
 

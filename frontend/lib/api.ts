@@ -56,7 +56,9 @@ export type ReadinessResponse = {
   };
   scorecard?: {
     score: number;
+    raw_score: number;
     target: number;
+    launch_ready_threshold: number;
     grade: string;
     summary: string;
   };

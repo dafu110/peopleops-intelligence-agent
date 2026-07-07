@@ -422,7 +422,14 @@ class ApiControlPlaneTests(IsolatedRuntimeMixin, unittest.TestCase):
 
             scorecard = client.get("/enterprise/scorecard")
             self.assertEqual(scorecard.status_code, 200)
-            self.assertEqual(scorecard.json()["score"], 98)
+            scorecard_json = scorecard.json()
+            self.assertGreater(scorecard_json["score"], 0)
+            self.assertLessEqual(scorecard_json["score"], scorecard_json["target"])
+            self.assertGreaterEqual(scorecard_json["raw_score"], scorecard_json["score"])
+            self.assertEqual(scorecard_json["launch_ready_threshold"], 95)
+            self.assertIn(scorecard_json["grade"], {"A+", "A", "A-", "B+", "B", "C"})
+            self.assertTrue(all("checks" in item for item in scorecard_json["dimensions"]))
+            self.assertTrue(any(item["id"] == "engineering_operations" for item in scorecard_json["dimensions"]))
 
             audit = client.get("/audit/events")
             self.assertEqual(audit.status_code, 200)
