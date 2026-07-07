@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 from functools import lru_cache
 from typing import Dict, List, Tuple
@@ -10,10 +11,66 @@ from .audit import write_audit_event
 from .config import get_chat_model, get_settings
 
 
+_TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+
+
 def _source_label(doc: Document) -> str:
     settings = get_settings()
     page_num = int(doc.metadata.get("page", 0)) + 1
     return f"《{settings.policy_pdf_path.name}》第 {page_num} 页"
+
+
+def _dedupe_key(doc: Document) -> tuple[object, str]:
+    return doc.metadata.get("page", 0), doc.page_content[:160]
+
+
+def _query_terms(text: str) -> set[str]:
+    compact = re.sub(r"\s+", "", text.lower())
+    terms = set(_TOKEN_RE.findall(compact))
+    for size in (2, 3, 4):
+        terms.update(compact[index : index + size] for index in range(max(len(compact) - size + 1, 0)))
+    return {term for term in terms if term.strip()}
+
+
+def _lexical_score(question_terms: set[str], doc: Document) -> int:
+    if not question_terms:
+        return 0
+    content = re.sub(r"\s+", "", doc.page_content.lower())
+    return sum(1 for term in question_terms if term in content)
+
+
+class HybridPolicyRetriever:
+    def __init__(self, vector_retriever, splits: list[Document]):
+        self.vector_retriever = vector_retriever
+        self.splits = splits
+
+    def invoke(self, question: str) -> list[Document]:
+        settings = get_settings()
+        docs_by_key: dict[tuple[object, str], Document] = {}
+        vector_rank: dict[tuple[object, str], int] = {}
+        lexical_scores: dict[tuple[object, str], int] = {}
+
+        for index, doc in enumerate(self.vector_retriever.invoke(question)):
+            key = _dedupe_key(doc)
+            docs_by_key[key] = doc
+            vector_rank[key] = index
+
+        question_terms = _query_terms(question)
+        for doc in self.splits:
+            score = _lexical_score(question_terms, doc)
+            key = _dedupe_key(doc)
+            lexical_scores[key] = score
+            if score > 0:
+                docs_by_key[key] = doc
+
+        ranked_keys = sorted(
+            docs_by_key,
+            key=lambda key: (
+                -lexical_scores.get(key, 0),
+                vector_rank.get(key, len(vector_rank) + 100),
+            ),
+        )
+        return [docs_by_key[key] for key in ranked_keys[: settings.rag_top_k]]
 
 
 def _current_manifest() -> Dict[str, object]:
@@ -179,6 +236,7 @@ def _build_retriever():
             persist_directory=str(settings.chroma_persist_dir),
             embedding_function=embeddings,
         )
+        splits = _load_policy_splits()
     else:
         reset_rag_index()
         splits = _load_policy_splits()
@@ -204,7 +262,7 @@ def _build_retriever():
             },
         )
 
-    return vectorstore.as_retriever(search_kwargs={"k": settings.rag_top_k})
+    return HybridPolicyRetriever(vectorstore.as_retriever(search_kwargs={"k": settings.rag_top_k}), splits)
 
 
 def retrieve_policy_context(question: str) -> Tuple[str, List[str]]:

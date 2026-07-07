@@ -511,8 +511,8 @@ def init_state() -> None:
             {
                 "role": "assistant",
                 "content": (
-                    "浣犲ソ锛屾垜鏄?PeopleOps Intelligence Assistant銆備綘鍙互涓婁紶鍊欓€変汉绠€鍘嗗苟绮樿创 JD 鍋氬尮閰嶈瘎浼帮紝"
-                    "涔熷彲浠ヨ闂憳宸ユ墜鍐屻€佽€冨嫟銆佹姤閿€銆佺鍒╃瓑鍒跺害闂銆?
+                    "你好，我是 PeopleOps Intelligence Assistant。你可以上传候选人简历并粘贴 JD 做匹配评估，"
+                    "也可以询问员工手册、考勤、报销、福利等制度问题。"
                 ),
             }
         ],
@@ -524,7 +524,7 @@ def render_stream(text: str) -> None:
     displayed = ""
     for chunk in text:
         displayed += chunk
-        placeholder.markdown(displayed + "鈻?)
+        placeholder.markdown(displayed + "▌")
         time.sleep(0.002)
     placeholder.markdown(text)
 
@@ -564,7 +564,8 @@ def render_auto_evidence_preview() -> None:
         st.markdown(
             """
             <div class="po-context-note">
-              寮曠敤鐗囨浼氭牴鎹富宸ヤ綔鍖烘渶杩戜竴娆℃彁闂嚜鍔ㄥ埛鏂帮紱杩欓噷涓嶅啀鍗曠嫭鎻愪緵妫€绱㈠叆鍙ｃ€?            </div>
+              引用片段会根据主工作区最近一次提问自动刷新；这里不再单独提供检索入口。
+            </div>
             """,
             unsafe_allow_html=True,
         )
@@ -572,10 +573,10 @@ def render_auto_evidence_preview() -> None:
 
     evidence = get_policy_evidence(question)
     if not evidence:
-        st.markdown('<div class="po-context-note">鏈€杩戜竴娆℃彁闂殏鏃犲彲灞曠ず寮曠敤銆?/div>', unsafe_allow_html=True)
+        st.markdown('<div class="po-context-note">最近一次提问暂无可展示引用。</div>', unsafe_allow_html=True)
         return
 
-    st.caption(f"鍩轰簬鏈€杩戞彁闂細{question[:42]}{'...' if len(question) > 42 else ''}")
+    st.caption(f"基于最近提问：{question[:42]}{'...' if len(question) > 42 else ''}")
     for item in evidence[:2]:
         st.markdown(
             f"""
@@ -590,10 +591,10 @@ def render_auto_evidence_preview() -> None:
 
 def render_runtime_signals() -> None:
     rows = [
-        ("鐭ヨ瘑搴?, "Ready" if settings.policy_pdf_path.exists() else "Missing PDF"),
+        ("知识库", "Ready" if settings.policy_pdf_path.exists() else "Missing PDF"),
         ("LLM", "Configured" if settings.has_llm_config else "Degraded"),
-        ("璁块棶鎺у埗", "Enabled" if settings.access_password else "Local Demo"),
-        ("宸ュ叿妯″紡", settings.tool_execution_mode.upper()),
+        ("访问控制", "Enabled" if settings.access_password else "Local Demo"),
+        ("工具模式", settings.tool_execution_mode.upper()),
     ]
     for label, value in rows:
         left, right = st.columns([1.15, 0.85], gap="small")
@@ -617,40 +618,40 @@ def workflow_snapshot(jd_input: str) -> dict:
     integrity = verify_audit_integrity()
 
     if not has_resume and not has_jd:
-        next_action = "鍏堝湪宸︿晶瀵煎叆鍊欓€変汉绠€鍘嗗苟绮樿创 JD锛屽舰鎴愬彲璇勪及鐨勪笂涓嬫枃銆?
+        next_action = "先在左侧导入候选人简历并粘贴 JD，形成可评估的上下文。"
     elif not has_resume:
-        next_action = "JD 宸插氨缁紱缁х画瀵煎叆绠€鍘嗗悗鍗冲彲璁?Agent 杈撳嚭鍖归厤鎶ュ憡銆?
+        next_action = "JD 已就绪；继续导入简历后即可让 Agent 输出匹配报告。"
     elif not has_jd:
-        next_action = "绠€鍘嗗凡灏辩华锛涜ˉ鍏?JD 鍚庡彲鑾峰緱鏇村彲淇＄殑鍖归厤鍒ゆ柇銆?
+        next_action = "简历已就绪；补充 JD 后可获得更可信的匹配判断。"
     elif not interviews:
-        next_action = "鏉愭枡宸查綈锛涘湪涓嬫柟瀵硅瘽涓姹?Agent 鍋氬€欓€変汉鍖归厤鎴栫敓鎴愬€欓€変汉璺熻繘鍔ㄤ綔銆?
+        next_action = "材料已齐；在下方对话中要求 Agent 做候选人匹配或生成候选人跟进动作。"
     elif pending_approvals:
-        next_action = "宸叉湁寰呭鍔ㄤ綔锛涘垏鍒版不鐞嗚瘉鎹〉鏌ョ湅瀹℃壒闃熷垪鍜屽璁￠摼銆?
+        next_action = "已有待审动作；切到治理证据页查看审批队列和审计链。"
     else:
-        next_action = "闂幆宸插舰鎴愶紱鍙湪娌荤悊璇佹嵁椤靛鏍稿姩浣溿€佷骇鐗╁拰瀹¤璁板綍銆?
+        next_action = "闭环已形成；可在治理证据页复核动作、产物和审计记录。"
 
     steps = [
         {
-            "title": "杈撳叆鏉愭枡",
-            "copy": f"{resume_count} 浠界畝鍘嗭紝JD {'宸插～鍐? if has_jd else '寰呭～鍐?}銆?,
+            "title": "输入材料",
+            "copy": f"{resume_count} 份简历，JD {'已填写' if has_jd else '待填写'}。",
             "state": "Ready" if has_resume and has_jd else "Needs Input",
             "tone": "green" if has_resume and has_jd else "amber",
         },
         {
-            "title": "Agent 鍒ゆ柇",
-            "copy": "鑷姩璺敱鍒版斂绛栭棶绛斻€佺畝鍘嗗尮閰嶆垨琛屾斂鍔ㄤ綔宸ュ叿銆?,
+            "title": "Agent 判断",
+            "copy": "自动路由到政策问答、简历匹配或行政动作工具。",
             "state": "Online" if settings.has_llm_config else "Degraded",
             "tone": "green" if settings.has_llm_config else "amber",
         },
         {
-            "title": "鎵ц鍔ㄤ綔",
-            "copy": f"{len(interviews)} 鏉℃墽琛屽姩浣滐紝{len(pending_approvals)} 鏉″緟瀹¤姹傘€?,
+            "title": "执行动作",
+            "copy": f"{len(interviews)} 条执行动作，{len(pending_approvals)} 条待审请求。",
             "state": "Active" if interviews or pending_approvals else "Waiting",
             "tone": "green" if interviews else "blue",
         },
         {
-            "title": "璇佹嵁鍥炴祦",
-            "copy": f"{len(events)} 鏉″璁′簨浠讹紝瀹¤閾?{'鏈夋晥' if integrity.get('valid') else '寰呭鏍?}銆?,
+            "title": "证据回流",
+            "copy": f"{len(events)} 条审计事件，审计链{'有效' if integrity.get('valid') else '待复核'}。",
             "state": "Valid" if integrity.get("valid") else "Review",
             "tone": "green" if integrity.get("valid") else "amber",
         },
@@ -658,10 +659,10 @@ def workflow_snapshot(jd_input: str) -> dict:
     return {
         "steps": steps,
         "rail": [
-            ("鏀堕泦鏉愭枡", has_resume and has_jd),
-            ("鐢熸垚鍒ゆ柇", settings.has_llm_config),
-            ("鎵ц鍔ㄤ綔", bool(interviews or pending_approvals)),
-            ("瀹¤澶嶆牳", bool(integrity.get("valid"))),
+            ("收集材料", has_resume and has_jd),
+            ("生成判断", settings.has_llm_config),
+            ("执行动作", bool(interviews or pending_approvals)),
+            ("审计复核", bool(integrity.get("valid"))),
         ],
         "next_action": next_action,
         "interviews": interviews,
@@ -691,7 +692,7 @@ def render_workflow_loop(jd_input: str) -> dict:
     st.markdown(
         f"""
         <div class="po-next-action">
-          <strong>涓嬩竴姝ュ缓璁?/strong>
+          <strong>下一步建议</strong>
           <span>{escape(snapshot["next_action"])}</span>
         </div>
         """,
@@ -711,7 +712,8 @@ def render_topline() -> None:
             <div class="po-kicker">HRBP Operations Console</div>
             <h1 class="po-title">{escape(settings.app_name)}</h1>
             <div class="po-subtitle">
-              闈㈠悜浼佷笟鍐呴儴 PeopleOps 鐨?AI 宸ヤ綔鍙帮細涓诲璇濊礋璐ｆ彁闂笌鍔ㄤ綔锛屼晶杈规爮鍙鐞嗘潗鏂欏拰璇佹嵁銆?            </div>
+              面向企业内部 PeopleOps 的 AI 工作台：主对话负责提问与动作，侧边栏只管理材料和证据。
+            </div>
           </div>
           <div class="po-status-stack">
             {pill("LLM " + ("Configured" if settings.has_llm_config else "Degraded"), llm_tone)}
@@ -731,20 +733,20 @@ def require_access() -> None:
     st.markdown(
         """
         <div class="po-panel">
-          <div class="po-panel-title">鍙楁帶璁块棶</div>
-          <p class="po-panel-copy">璇疯緭鍏ヨ闂彛浠よ繘鍏?PeopleOps Intelligence Agent銆?/p>
+          <div class="po-panel-title">受控访问</div>
+          <p class="po-panel-copy">请输入访问口令进入 PeopleOps Intelligence Agent。</p>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    password = st.text_input("璁块棶鍙ｄ护", type="password")
-    if st.button("杩涘叆宸ヤ綔鍙?, type="primary"):
+    password = st.text_input("访问口令", type="password")
+    if st.button("进入工作台", type="primary"):
         if verify_password(password, settings.access_password):
             st.session_state["authenticated"] = True
             write_audit_event("auth.login_success", {"session_id": st.session_state["thread_id"]})
             st.rerun()
         write_audit_event("auth.login_failed", {"session_id": st.session_state["thread_id"]})
-        st.error("璁块棶鍙ｄ护涓嶆纭€?)
+        st.error("访问口令不正确。")
     st.stop()
 
 
@@ -752,17 +754,17 @@ def render_sidebar() -> str:
     with st.sidebar:
         st.markdown('<div class="po-section">Context</div>', unsafe_allow_html=True)
         uploaded_resumes = st.file_uploader(
-            "瀵煎叆绠€鍘嗘枃浠?,
+            "导入简历文件",
             type=["pdf", "docx", "txt", "md"],
             accept_multiple_files=True,
-            help="鏀寔 PDF銆乄ord DOCX銆乀XT銆丮arkdown锛屽彲涓€娆″鍏ュ浠藉€欓€変汉鏉愭枡銆?,
+            help="支持 PDF、Word DOCX、TXT、Markdown，可一次导入多份候选人材料。",
         )
 
         if uploaded_resumes:
             try:
                 extracted_parts = []
                 file_names = []
-                with st.spinner("姝ｅ湪鎻愬彇绠€鍘嗘枃鏈?.."):
+                with st.spinner("正在提取简历文本..."):
                     for uploaded_resume in uploaded_resumes:
                         text_content = cached_extract_document_text(
                             uploaded_resume.getvalue(),
@@ -770,7 +772,7 @@ def render_sidebar() -> str:
                         )
                         if text_content:
                             file_names.append(uploaded_resume.name)
-                            extracted_parts.append(f"銆愭枃浠讹細{uploaded_resume.name}銆慭n{text_content}")
+                            extracted_parts.append(f"【文件：{uploaded_resume.name}】\n{text_content}")
 
                 combined_text = "\n\n".join(extracted_parts).strip()
                 st.session_state["extracted_resume_text"] = combined_text
@@ -785,9 +787,9 @@ def render_sidebar() -> str:
                             "char_count": len(combined_text),
                         },
                     )
-                    st.success(f"宸插鍏?{len(file_names)} 涓枃浠?)
+                    st.success(f"已导入 {len(file_names)} 个文件")
                 else:
-                    st.warning("鏈彁鍙栧埌鍙敤鏂囨湰锛屽彲鑳芥槸鎵弿浠躲€佸浘鐗囧瀷绠€鍘嗘垨绌烘枃浠躲€?)
+                    st.warning("未提取到可用文本，可能是扫描件、图片型简历或空文件。")
             except Exception as exc:
                 st.session_state["extracted_resume_text"] = ""
                 st.session_state["resume_file_names"] = []
@@ -795,19 +797,19 @@ def render_sidebar() -> str:
                     "resume.upload_failed",
                     {"session_id": st.session_state["thread_id"], "error": str(exc)},
                 )
-                st.error(f"绠€鍘嗚В鏋愬け璐ワ細{exc}")
+                st.error(f"简历解析失败：{exc}")
         else:
             st.session_state["extracted_resume_text"] = ""
             st.session_state["resume_file_names"] = []
 
         jd_input = st.text_area(
-            "宀椾綅鎻忚堪 JD",
+            "岗位描述 JD",
             height=230,
-            placeholder="绮樿创宀椾綅鑱岃矗銆佷换鑱岃姹傘€佹妧鑳芥爤銆佸勾闄愯姹傜瓑淇℃伅...",
+            placeholder="粘贴岗位职责、任职要求、技能栈、年限要求等信息...",
         )
 
         if st.session_state["extracted_resume_text"]:
-            with st.expander("绠€鍘嗘枃鏈瑙?, expanded=False):
+            with st.expander("简历文本预览", expanded=False):
                 st.text(st.session_state["extracted_resume_text"][:3000])
 
         st.markdown('<div class="po-section">Evidence</div>', unsafe_allow_html=True)
@@ -828,22 +830,22 @@ def render_metrics() -> None:
 
     cols = st.columns(5)
     with cols[0]:
-        st.metric("浼氳瘽", session_short_id)
+        st.metric("会话", session_short_id)
     with cols[1]:
-        st.metric("绠€鍘嗘枃浠?, len(st.session_state["resume_file_names"]))
+        st.metric("简历文件", len(st.session_state["resume_file_names"]))
     with cols[2]:
-        st.metric("鎵ц鍔ㄤ綔", len(interviews))
+        st.metric("执行动作", len(interviews))
     with cols[3]:
-        st.metric("寰呭璇锋眰", len([item for item in approvals if item["status"] == "PENDING"]))
+        st.metric("待审请求", len([item for item in approvals if item["status"] == "PENDING"]))
     with cols[4]:
-        st.metric("瀹¤閾?, "Valid" if integrity.get("valid") else "Review")
+        st.metric("审计链", "Valid" if integrity.get("valid") else "Review")
 
     st.markdown(
         f"""
         <div class="po-panel">
           <div class="po-panel-title">Enterprise posture</div>
           <p class="po-panel-copy">
-            Tenant: {escape(settings.default_tenant_id)} 路 DB: {escape(settings.database_backend)} 路 Vector: {escape(settings.vector_backend)} 路
+            Tenant: {escape(settings.default_tenant_id)} · DB: {escape(settings.database_backend)} · Vector: {escape(settings.vector_backend)} ·
             Connectors configured: {len(configured_connectors)}/{len(connectors)}
           </p>
         </div>
@@ -932,13 +934,13 @@ def render_activity_panel(snapshot: dict) -> None:
                     f"""
                     <div class="po-ledger-row">
                       <div class="po-ledger-key">#{escape(str(approval['id']))}</div>
-                      <div class="po-ledger-value">{escape(str(approval['status']))} 路 {escape(str(approval['action_type']))} 路 {escape(str(approval['subject_ref']))}</div>
+                      <div class="po-ledger-value">{escape(str(approval['status']))} · {escape(str(approval['action_type']))} · {escape(str(approval['subject_ref']))}</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
         else:
-            st.markdown('<div class="po-empty">鏆傛棤寰呭鐞嗗鎵广€?/div>', unsafe_allow_html=True)
+            st.markdown('<div class="po-empty">暂无待处理审批。</div>', unsafe_allow_html=True)
 
     with audit_col:
         st.markdown('<div class="po-section">Audit Trail</div>', unsafe_allow_html=True)
@@ -949,13 +951,13 @@ def render_activity_panel(snapshot: dict) -> None:
                     f"""
                     <div class="po-ledger-row">
                       <div class="po-ledger-key">{escape(str(event.get('event_type', 'event')))}</div>
-                      <div class="po-ledger-value">{escape(str(event.get('timestamp', '')[:19]))} 路 {escape(str(event.get('actor') or 'local'))}</div>
+                      <div class="po-ledger-value">{escape(str(event.get('timestamp', '')[:19]))} · {escape(str(event.get('actor') or 'local'))}</div>
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
         else:
-            st.markdown('<div class="po-empty">鏆傛棤瀹¤浜嬩欢銆?/div>', unsafe_allow_html=True)
+            st.markdown('<div class="po-empty">暂无审计事件。</div>', unsafe_allow_html=True)
     render_connector_panel()
 
 
@@ -965,22 +967,23 @@ def render_primary_chat(jd_input: str) -> None:
         <div class="po-agent-hero">
           <h2 class="po-agent-title">PeopleOps Intelligence Assistant</h2>
           <p class="po-agent-copy">
-            缁熶竴澶勭悊鍒跺害闂瓟銆佺畝鍘?JD 鍖归厤鍜屽€欓€変汉璺熻繘鍔ㄤ綔锛涘紩鐢ㄥ拰鐣欑棔浼氬湪渚ц竟鏍忎笌娌荤悊鍖鸿嚜鍔ㄦ洿鏂般€?          </p>
+            统一处理制度问答、简历/JD 匹配和候选人跟进动作；引用和留痕会在侧边栏与治理区自动更新。
+          </p>
         </div>
         """,
         unsafe_allow_html=True,
     )
     with st.form("primary_agent_prompt_form", clear_on_submit=True):
         user_input = st.text_area(
-            "杈撳叆浣犵殑闂",
-            placeholder="杈撳叆闂鎴栦换鍔★紝渚嬪锛氬嚭宸姤閿€鏈変粈涔堟爣鍑嗭紵杩欎唤绠€鍘嗗拰 JD 鍖归厤鍚楋紵",
+            "输入你的问题",
+            placeholder="输入问题或任务，例如：出差报销有什么标准？这份简历和 JD 匹配吗？",
             label_visibility="collapsed",
         )
         _, send_col = st.columns([5, 1])
         with send_col:
-            submitted = st.form_submit_button("鍙戦€?, type="primary", use_container_width=True)
+            submitted = st.form_submit_button("发送", type="primary", use_container_width=True)
 
-    st.markdown('<div class="po-chat-feed-label">Conversation</div>', unsafe_allow_html=True)
+    st.markdown('<div class="po-chat-feed-label">对话记录</div>', unsafe_allow_html=True)
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
@@ -1010,7 +1013,7 @@ def render_primary_chat(jd_input: str) -> None:
                 }
                 config = {"configurable": {"thread_id": st.session_state["thread_id"]}}
                 output = runtime.invoke(inputs, config)
-                full_response = output.get("reply") or "鎶辨瓑锛岀郴缁熸湭鑳界敓鎴愭湁鏁堝洖澶嶃€?
+                full_response = output.get("reply") or "抱歉，系统未能生成有效回复。"
                 render_stream(full_response)
                 st.session_state.messages.append({"role": "assistant", "content": full_response})
                 write_audit_event(
@@ -1026,7 +1029,7 @@ def render_primary_chat(jd_input: str) -> None:
                     "chat.error",
                     {"session_id": st.session_state["thread_id"], "error": str(exc)},
                 )
-                st.error(f"杩愯鍙戠敓閿欒锛歿exc}")
+                st.error(f"运行发生错误：{exc}")
 
 
 init_state()
@@ -1035,10 +1038,10 @@ render_topline()
 jd_text = render_sidebar()
 render_primary_chat(jd_text)
 
-with st.expander("Operational status", expanded=False):
+with st.expander("运行状态", expanded=False):
     render_metrics()
     workflow_state = render_workflow_loop(jd_text)
 
-tabs = st.tabs(["Governance Evidence"])
+tabs = st.tabs(["治理证据"])
 with tabs[0]:
     render_activity_panel(workflow_state)
