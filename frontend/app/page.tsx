@@ -470,8 +470,7 @@ export default function Home() {
   const overviewSignals = [
     { label: "材料", value: materialStatus, tone: resumeText.trim() || resumeFiles.length ? "ok" : "warn" },
     { label: "岗位", value: jdStatus, tone: jdText.trim() ? "ok" : "warn" },
-    { label: "审批", value: approvals.filter((item) => item.status === "PENDING").length.toString(), tone: approvals.some((item) => item.status === "PENDING") ? "warn" : "ok" },
-    { label: "审计", value: auditLabel(auditValid), tone: auditValid ? "ok" : "warn" },
+    { label: "证据", value: latestAssistantEvidence.length ? `${latestAssistantEvidence.length} 条引用` : "待生成", tone: latestAssistantEvidence.length ? "ok" : "warn" },
   ];
   const workflowSteps = [
     {
@@ -624,7 +623,7 @@ export default function Home() {
             <span>当前租户</span>
             <strong>{tenantName}</strong>
           </div>
-          <em>Pro</em>
+          <em>Demo</em>
         </section>
 
         <nav className="side-nav" aria-label="产品导航">
@@ -663,13 +662,13 @@ export default function Home() {
             value={resumeText}
             onChange={(event) => setResumeText(event.target.value)}
             placeholder="候选人简历、面试记录或关键摘要会出现在这里。"
-            rows={7}
+            rows={5}
           />
           <textarea
             value={jdText}
             onChange={(event) => setJdText(event.target.value)}
             placeholder="粘贴岗位 JD、能力要求和年限要求。"
-            rows={7}
+            rows={5}
           />
         </section>
 
@@ -712,8 +711,8 @@ export default function Home() {
         <header className="workspace-header">
           <div>
             <p className="eyebrow">HRBP 运营控制台</p>
-            <h2>{health?.app_name || "PeopleOps 智能体平台"}</h2>
-            <p>面向多租户 PeopleOps 团队的 AI 工作台：集中处理政策问答、简历匹配、候选人跟进、审批和审计追溯。</p>
+            <h2>{health?.app_name || "PeopleOps Agent 工作台"}</h2>
+            <p>把政策问答、简历匹配和候选人跟进收束到一个可追溯的 Agent 工作流。</p>
           </div>
           <div className="header-ops">
             <div className="workspace-actions" aria-label="工作区动作">
@@ -753,25 +752,26 @@ export default function Home() {
 
         {activeProductView === "workspace" ? (
           <>
-        <section className="overview-strip" aria-label="运营态势">
-          {overviewSignals.map((item) => (
-            <div className={`signal-card ${item.tone}`} key={item.label}>
-              <span>{item.label}</span>
-              <strong>{item.value}</strong>
-            </div>
-          ))}
-        </section>
-
-        <section className="workflow-strip" aria-label="首次使用流程">
-          {workflowSteps.map((step) => (
-            <div className={step.ok ? "workflow-step done" : "workflow-step"} key={step.label}>
-              <span>{step.label}</span>
-              <div>
+        <section className="focus-panel" aria-label="演示路径">
+          <div className="focus-copy">
+            <p className="eyebrow">默认演示路径</p>
+            <h3>先给 Agent 一个 HR 场景，再查看证据和动作。</h3>
+          </div>
+          <div className="focus-steps">
+            {workflowSteps.map((step) => (
+              <div className={step.ok ? "focus-step done" : "focus-step"} key={step.label}>
+                <span>{step.label}</span>
                 <strong>{step.title}</strong>
-                <p>{step.body}</p>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+          <div className="focus-signals" aria-label="关键状态">
+            {overviewSignals.map((item) => (
+              <span className={item.tone} key={item.label}>
+                {item.label} · {item.value}
+              </span>
+            ))}
+          </div>
         </section>
 
         {error ? (
