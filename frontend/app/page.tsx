@@ -3,10 +3,7 @@
 import {
   Activity,
   AlertTriangle,
-  BarChart3,
   Bot,
-  BriefcaseBusiness,
-  Building2,
   Check,
   CheckCircle2,
   Clock3,
@@ -16,7 +13,6 @@ import {
   GitBranch,
   Hash,
   Layers3,
-  LockKeyhole,
   MessageSquareText,
   Play,
   Plug,
@@ -42,10 +38,8 @@ import {
   OperationsSummary,
   ProductionCheckRecord,
   ProductionChecksResponse,
-  RagEvidence,
   ReadinessResponse,
   TaskRun,
-  TaskEvent,
   ToolExecutionRecord,
   ToolRecord,
   extractDocument,
@@ -64,159 +58,28 @@ import {
   sendChat,
   transitionApproval,
 } from "../lib/api";
-
-type ProductView = "workspace" | "candidates" | "approvals" | "connectors" | "audit" | "settings";
-type InspectorView = "overview" | "trace" | "actions" | "audit";
-
-const starterMessages: ChatMessage[] = [
-  {
-    role: "assistant",
-    content:
-      "你好，我是 PeopleOps 智能助手。你可以上传简历、粘贴 JD，或直接询问制度、报销、考勤、福利和候选人跟进动作。",
-  },
-];
-
-function statusTone(ok?: boolean) {
-  return ok ? "status-pill ok" : "status-pill warn";
-}
-
-function readinessLabel(ok?: boolean) {
-  return ok ? "生产就绪" : "待复核";
-}
-
-function auditLabel(ok?: boolean) {
-  return ok ? "审计有效" : "待检查";
-}
-
-function shortText(value: string | undefined, fallback = "暂无") {
-  if (!value) return fallback;
-  return value.length > 72 ? `${value.slice(0, 72)}...` : value;
-}
-
-function connectorSummary(connectors: ConnectorRecord[]) {
-  const configured = connectors.filter((item) => item.status === "configured").length;
-  return `${configured}/${connectors.length}`;
-}
-
-function parseJsonSafe(value?: string) {
-  if (!value) return null;
-  try {
-    return JSON.parse(value) as unknown;
-  } catch {
-    return value;
-  }
-}
-
-function previewJson(value: unknown, fallback = "暂无详情") {
-  if (value === null || value === undefined || value === "") return fallback;
-  const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
-  return text.length > 520 ? `${text.slice(0, 520)}...` : text;
-}
-
-function formatDateTime(value?: string) {
-  if (!value) return "--";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
-
-function formatDuration(start?: string, end?: string) {
-  if (!start || !end) return "--";
-  const delta = new Date(end).getTime() - new Date(start).getTime();
-  if (!Number.isFinite(delta) || delta < 0) return "--";
-  if (delta < 1000) return `${delta}ms`;
-  return `${(delta / 1000).toFixed(1)}s`;
-}
-
-function normalizeKeyword(value: string) {
-  return value.replace(/[^\p{L}\p{N}_-]/gu, "").trim().toLowerCase();
-}
-
-function searchTerms(question: string) {
-  const normalized = normalizeKeyword(question);
-  const cjkTerms = Array.from(question.matchAll(/[\u4e00-\u9fff]{2,}/g)).flatMap((match) => {
-    const value = match[0];
-    const terms = [value.slice(0, 6)];
-    for (let index = 0; index < value.length - 1; index += 1) {
-      terms.push(value.slice(index, index + 2));
-    }
-    return terms;
-  });
-  const wordTerms = question.split(/\s+/).map(normalizeKeyword);
-  return Array.from(new Set([...wordTerms, ...cjkTerms, normalized])).filter((term) => term.length >= 2).slice(0, 18);
-}
-
-function keywordHits(question: string, snippet: string) {
-  const terms = searchTerms(question);
-  const lowerSnippet = snippet.toLowerCase();
-  return terms.filter((term) => lowerSnippet.includes(term)).slice(0, 5);
-}
-
-function inferPageLabel(source: string) {
-  const match = source.match(/(?:page|p)[-_ ]?(\d+)/i) || source.match(/#page=(\d+)/i);
-  return match ? `p.${match[1]}` : "chunk";
-}
-
-function evidenceReliability(item: RagEvidence, question: string) {
-  const hits = keywordHits(question, item.snippet);
-  if (!item.snippet) return "无片段";
-  if (hits.length >= 2) return "关键词命中";
-  if (item.source) return "可追溯";
-  return "待复核";
-}
-
-function statusClass(status?: string) {
-  const normalized = (status || "").toLowerCase();
-  if (["success", "succeeded", "completed", "approved", "ready", "ok"].some((term) => normalized.includes(term))) return "ok";
-  if (["fail", "error", "reject", "cancel"].some((term) => normalized.includes(term))) return "danger";
-  if (["pending", "running", "review", "check"].some((term) => normalized.includes(term))) return "warn";
-  return "neutral";
-}
-
-function statusLabel(status?: string) {
-  const normalized = (status || "").toUpperCase();
-  const labels: Record<string, string> = {
-    APPROVED: "已通过",
-    CANCELLED: "已取消",
-    COMPLETED: "已完成",
-    CONFIGURED: "已配置",
-    ERROR: "错误",
-    FAILED: "失败",
-    PENDING: "待审批",
-    READY: "就绪",
-    REJECTED: "已拒绝",
-    RUNNING: "运行中",
-    SUCCESS: "成功",
-    SUCCEEDED: "成功",
-  };
-  return labels[normalized] || status || "--";
-}
-
-function eventSummary(event: TaskEvent) {
-  const payload = event.payload || {};
-  const keys = Object.keys(payload);
-  if (!keys.length) return "无 payload";
-  const preferred = ["intent", "tool_name", "status", "evidence_count", "reply_chars", "error"];
-  const picked = preferred.filter((key) => key in payload);
-  const displayKeys = picked.length ? picked : keys.slice(0, 3);
-  return displayKeys.map((key) => `${key}: ${String(payload[key]).slice(0, 48)}`).join(" · ");
-}
-
-function getInitialProductView(): ProductView {
-  if (typeof window === "undefined") return "workspace";
-  const view = new URLSearchParams(window.location.search).get("view");
-  return ["workspace", "candidates", "approvals", "connectors", "audit", "settings"].includes(view || "")
-    ? (view as ProductView)
-    : "workspace";
-}
-
-function getInitialInspectorView(): InspectorView {
-  if (typeof window === "undefined") return "overview";
-  const inspector = new URLSearchParams(window.location.search).get("inspector");
-  return ["overview", "trace", "actions", "audit"].includes(inspector || "")
-    ? (inspector as InspectorView)
-    : "overview";
-}
+import { ContextPanel } from "../components/context-panel";
+import {
+  auditLabel,
+  connectorSummary,
+  eventSummary,
+  evidenceReliability,
+  formatDateTime,
+  formatDuration,
+  getInitialInspectorView,
+  getInitialProductView,
+  inferPageLabel,
+  keywordHits,
+  parseJsonSafe,
+  previewJson,
+  readinessLabel,
+  shortText,
+  starterMessages,
+  statusClass,
+  statusLabel,
+  statusTone,
+} from "../lib/ui-helpers";
+import type { InspectorView, ProductView } from "../lib/ui-helpers";
 
 function EmptyState({
   icon: Icon,
@@ -606,106 +469,23 @@ export default function Home() {
 
   return (
     <main className="app-shell">
-      <aside className="context-panel" id="candidate-context">
-        <div className="brand-block">
-          <div className="brand-mark">P</div>
-          <div>
-            <p className="eyebrow">PeopleOps</p>
-            <h1>智能控制台</h1>
-          </div>
-        </div>
-
-        <section className="tenant-card" aria-label="租户信息">
-          <div className="tenant-mark">
-            <Building2 size={17} />
-          </div>
-          <div>
-            <span>当前租户</span>
-            <strong>{tenantName}</strong>
-          </div>
-          <em>Demo</em>
-        </section>
-
-        <nav className="side-nav" aria-label="产品导航">
-          {navigationItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                aria-current={activeProductView === item.id ? "page" : undefined}
-                className={activeProductView === item.id ? "active" : ""}
-                key={item.label}
-                onClick={() => setActiveProductView(item.id)}
-                type="button"
-              >
-                <Icon size={16} />
-                <span>{item.label}</span>
-                <strong>{item.value}</strong>
-              </button>
-            );
-          })}
-        </nav>
-
-        <section className="panel-section">
-          <div className="section-title">
-            <BriefcaseBusiness size={16} />
-            候选人与岗位上下文
-          </div>
-          <label className="file-drop">
-            <Upload size={18} />
-            <span>{isExtracting ? "正在解析文档" : "上传简历或材料"}</span>
-            <input multiple type="file" accept=".pdf,.docx,.txt,.md,.markdown" onChange={handleFiles} />
-          </label>
-          <div className="file-list">
-            {resumeFiles.length ? resumeFiles.map((name) => <span key={name}>{name}</span>) : "支持 PDF、DOCX、TXT、MD；上传后由后端解析文本。"}
-          </div>
-          <textarea
-            value={resumeText}
-            onChange={(event) => setResumeText(event.target.value)}
-            placeholder="候选人简历、面试记录或关键摘要会出现在这里。"
-            rows={5}
-          />
-          <textarea
-            value={jdText}
-            onChange={(event) => setJdText(event.target.value)}
-            placeholder="粘贴岗位 JD、能力要求和年限要求。"
-            rows={5}
-          />
-        </section>
-
-        <section className="panel-section compact">
-          <div className="section-title">
-            <LockKeyhole size={16} />
-            访问与后端
-          </div>
-          <form className="access-form" onSubmit={(event) => event.preventDefault()}>
-            <input
-              aria-label="访问口令"
-              autoComplete="current-password"
-              value={accessPassword}
-              onChange={(event) => setAccessPassword(event.target.value)}
-              onBlur={(event) => refreshOperationalData(event.currentTarget.value)}
-              type="password"
-              placeholder="访问口令"
-            />
-          </form>
-          <p className="subtle">API: {API_BASE}</p>
-        </section>
-
-        <section className="usage-card" aria-label="本月用量">
-          <div className="section-title">
-            <BarChart3 size={16} />
-            本月用量
-          </div>
-          <div className="usage-grid">
-            {usageItems.map((item) => (
-              <div key={item.label}>
-                <strong>{item.value}</strong>
-                <span>{item.label}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      </aside>
+      <ContextPanel
+        accessPassword={accessPassword}
+        activeProductView={activeProductView}
+        handleFiles={handleFiles}
+        isExtracting={isExtracting}
+        jdText={jdText}
+        navigationItems={navigationItems}
+        refreshOperationalData={refreshOperationalData}
+        resumeFiles={resumeFiles}
+        resumeText={resumeText}
+        setAccessPassword={setAccessPassword}
+        setActiveProductView={setActiveProductView}
+        setJdText={setJdText}
+        setResumeText={setResumeText}
+        tenantName={tenantName}
+        usageItems={usageItems}
+      />
 
       <section className="workspace">
         <header className="workspace-header">

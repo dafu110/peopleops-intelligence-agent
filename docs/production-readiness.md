@@ -3,6 +3,11 @@
 This checklist turns PeopleOps Intelligence Agent from a local demo into a
 production SaaS deployment candidate.
 
+For release evidence requirements, also use
+[`operations-readiness-gates.md`](operations-readiness-gates.md). It defines the
+external connector, object storage, migration, monitoring, and release-drill
+proof expected before live tool execution.
+
 ## 1. Production Dependencies
 
 Production must run on managed services instead of local reference stores.

@@ -158,6 +158,8 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 | `backend/scripts/` | Utility scripts for password hashing and RAG evaluation. |
 | `backend/tests/` | Unit tests for core behavior, API control plane, security, tenancy, and evaluation helpers. |
 
+Production gate details are tracked in [`docs/operations-readiness-gates.md`](docs/operations-readiness-gates.md), including external connector proof, object storage checks, migration expectations, monitoring alerts, and release-drill evidence.
+
 ## Configuration
 
 | Variable | Default | Purpose |
