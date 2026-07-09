@@ -220,3 +220,10 @@ docker compose -f infra/docker-compose.yml up --build
 ```
 
 Open the web console at `http://127.0.0.1:3000`; the FastAPI control plane is exposed at `http://127.0.0.1:8000`.
+
+## Launch Readiness
+
+- [Launch hardening checklist](docs/launch-hardening.md)
+- [ADR: Governed PeopleOps tool execution](docs/adr/0001-governed-peopleops-tools.md)
+- [ADR: Public repository quality gates](docs/adr/0002-public-quality-gates.md)
+- [Agent operating guide](AGENTS.md)
