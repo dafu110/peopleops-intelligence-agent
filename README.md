@@ -36,6 +36,19 @@ Assemble context -> Agent judgment -> Execute action -> Governance evidence
 
 ![PeopleOps Intelligence Console running locally](docs/screenshots/peopleops-intelligence-console.png)
 
+## 60-Second Demo Flow
+
+Use this path when reviewing the project for the first time:
+
+1. Upload `data/测试简历.pdf` or paste resume text into the candidate context panel.
+2. Paste the JD from `data/职位描述.pdf`.
+3. Ask: `这份简历和 JD 的匹配度如何？`
+4. Ask: `差旅住宿报销标准是什么？`
+5. Ask: `生成候选人面试跟进动作。`
+6. Review the right-side evidence, task trace, approval/action records, and audit status.
+
+Full walkthrough: [`docs/demo-flow.md`](docs/demo-flow.md).
+
 ## Quick Start
 
 Run the FastAPI backend:
@@ -96,8 +109,25 @@ The product UI intentionally avoids duplicate search boxes: evidence retrieval i
 - Agent golden traces cover RAG routing, resume screening, missing-context handling, scheduling, and candidate-stage tool flows.
 - RAG evals require 100% pass rate in CI with keyword coverage, citation correctness, PII leakage, and forbidden-term checks.
 - Production readiness docs cover identity, managed state, object storage, connector configuration, eval reports, and rollback signals.
+- Public hygiene checks block tracked secrets, generated runtime state, stale README screenshots, mojibake markers, invalid JSONL fixtures, and broken local Markdown links.
 
 ## Architecture
+
+```mermaid
+flowchart LR
+    Operator["HRBP operator"] --> Console["Next.js console"]
+    Console --> API["FastAPI control plane"]
+    API --> Workflow["LangGraph agent workflow"]
+    Workflow --> Router["Intent router"]
+    Router --> RAG["Policy RAG with citations"]
+    Router --> Matcher["Resume/JD matcher"]
+    Router --> Tools["Governed tool execution"]
+    RAG --> Chroma["Chroma policy index"]
+    Tools --> Approvals["Human approval queue"]
+    Tools --> Artifacts["Email drafts, ICS, ATS payloads"]
+    API --> Audit["Hash-chained audit log"]
+    API --> DB["SQLite reference database"]
+```
 
 ```text
 Next.js Web Console / Streamlit Demo / FastAPI
@@ -157,8 +187,22 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 | `var/` | Local runtime state such as SQLite, audit logs, generated artifacts, and Chroma indexes. |
 | `backend/scripts/` | Utility scripts for password hashing and RAG evaluation. |
 | `backend/tests/` | Unit tests for core behavior, API control plane, security, tenancy, and evaluation helpers. |
+| `AGENTS.md` | Agent operating guide, required checks, public repo rules, and review priorities. |
 
 Production gate details are tracked in [`docs/operations-readiness-gates.md`](docs/operations-readiness-gates.md), including external connector proof, object storage checks, migration expectations, monitoring alerts, and release-drill evidence.
+
+## Demo vs Production Boundary
+
+This repository is intentionally clear about what is implemented locally and what must be configured for a live enterprise deployment.
+
+| Area | Local reference implementation | Production expectation |
+| --- | --- | --- |
+| Identity | Optional access password, roles, tenant headers, local defaults | SSO or OIDC with real bearer-token validation and gateway policy |
+| Database | SQLite runtime database | PostgreSQL with migrations, backups, and tenant-aware operational controls |
+| Vector search | Chroma policy index on local disk | Qdrant, pgvector, Milvus, or managed retrieval service with persistence and monitoring |
+| Files/artifacts | Local email drafts, calendar files, ATS export payloads | Object storage plus live connector probes and retention policies |
+| Tool actions | `dry_run`, `approval`, or local artifact creation | `approval` before live mode; compensation and rollback evidence required |
+| Observability | Readiness endpoint, audit hash chain, local tests/evals | Centralized logs, metrics, alerts, error budgets, and release-drill evidence |
 
 ## Configuration
 

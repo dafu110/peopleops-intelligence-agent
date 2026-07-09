@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
-import sys
+from urllib.parse import unquote, urlparse
 from pathlib import Path
 
 
@@ -60,6 +60,8 @@ TEXT_SUFFIXES = {
 }
 
 README_SCREENSHOT = "docs/screenshots/peopleops-intelligence-console.png"
+MARKDOWN_LINK_PATTERN = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
+LOCAL_MARKDOWN_TARGET_SUFFIXES = {".md", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".pdf"}
 
 
 def git_ls_files() -> list[str]:
@@ -138,6 +140,44 @@ def check_readme_screenshot(files: list[str], failures: list[str]) -> None:
             failures.append(f"Old README screenshot should stay deleted: {screenshot}")
 
 
+def is_local_link(target: str) -> bool:
+    parsed = urlparse(target)
+    if parsed.scheme or parsed.netloc:
+        return False
+    if target.startswith("#"):
+        return False
+    return True
+
+
+def check_markdown_links(files: list[str], failures: list[str]) -> None:
+    markdown_files = [item for item in files if item.endswith(".md")]
+    for item in markdown_files:
+        source = ROOT / item
+        if not source.exists():
+            continue
+        text = read_text(source)
+        for match in MARKDOWN_LINK_PATTERN.finditer(text):
+            target = match.group(1).strip()
+            if not target or not is_local_link(target):
+                continue
+            clean_target = target.split("#", 1)[0].strip()
+            if not clean_target:
+                continue
+            if clean_target.startswith("<") and clean_target.endswith(">"):
+                clean_target = clean_target[1:-1]
+            clean_target = unquote(clean_target)
+            target_path = (source.parent / clean_target).resolve()
+            try:
+                target_path.relative_to(ROOT)
+            except ValueError:
+                failures.append(f"Markdown link escapes repository root: {item} -> {target}")
+                continue
+            if Path(clean_target).suffix.lower() not in LOCAL_MARKDOWN_TARGET_SUFFIXES and "." not in Path(clean_target).name:
+                continue
+            if not target_path.exists():
+                failures.append(f"Broken local Markdown link: {item} -> {target}")
+
+
 def main() -> int:
     failures: list[str] = []
     files = git_ls_files()
@@ -145,6 +185,7 @@ def main() -> int:
     check_text_quality(files, failures)
     check_jsonl(files, failures)
     check_readme_screenshot(files, failures)
+    check_markdown_links(files, failures)
 
     if failures:
         print("Public repository hygiene check failed:")
