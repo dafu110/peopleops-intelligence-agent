@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { createChatSubmission } from "../lib/chat-workflow.mjs";
 
 const root = process.cwd();
 
@@ -37,4 +38,25 @@ test("operator console keeps primary workflow surfaces wired", () => {
   assert.match(helpers, /export function statusLabel/);
   assert.match(helpers, /export function evidenceReliability/);
   assert.match(helpers, /export function getInitialProductView/);
+});
+
+test("chat submission ignores blank or in-flight input", () => {
+  const messages = [{ role: "assistant", content: "你好" }];
+
+  assert.equal(createChatSubmission({ prompt: "   ", messages, isSending: false }), null);
+  assert.equal(createChatSubmission({ prompt: "政策问题", messages, isSending: true }), null);
+});
+
+test("chat submission trims input and appends the user message", () => {
+  const messages = [{ role: "assistant", content: "你好" }];
+
+  const submission = createChatSubmission({ prompt: "  差旅报销标准是什么？  ", messages, isSending: false });
+
+  assert.deepEqual(submission, {
+    message: "差旅报销标准是什么？",
+    messages: [
+      { role: "assistant", content: "你好" },
+      { role: "user", content: "差旅报销标准是什么？" },
+    ],
+  });
 });

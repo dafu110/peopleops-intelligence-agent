@@ -59,6 +59,7 @@ import {
   transitionApproval,
 } from "../lib/api";
 import { ContextPanel } from "../components/context-panel";
+import { createChatSubmission } from "../lib/chat-workflow.mjs";
 import {
   auditLabel,
   connectorSummary,
@@ -228,10 +229,10 @@ export default function Home() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const message = prompt.trim();
-    if (!message || isSending) return;
+    const submission = createChatSubmission({ prompt, messages, isSending });
+    if (!submission) return;
 
-    const nextMessages: ChatMessage[] = [...messages, { role: "user", content: message }];
+    const { message, messages: nextMessages } = submission;
     setMessages(nextMessages);
     setPrompt("");
     setIsSending(true);
