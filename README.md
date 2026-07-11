@@ -51,18 +51,24 @@ Full walkthrough: [`docs/demo-flow.md`](docs/demo-flow.md).
 
 ## Quick Start
 
-Run the FastAPI backend:
+Create the local configuration once. Keep `.env` out of source control and replace the sample model values before sending real Agent requests:
 
 ```powershell
-Copy-Item .env.example .env
-cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m uvicorn api:app --host 127.0.0.1 --port 8000
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-Run the professional frontend in another terminal:
+### Windows: FastAPI + Next.js
+
+Run the FastAPI backend in one PowerShell window. The commands call the virtual environment's Python directly, so PowerShell execution policy does not need to allow `Activate.ps1`:
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8000
+```
+
+Run the professional frontend in a second PowerShell window:
 
 ```powershell
 cd frontend
@@ -70,7 +76,27 @@ pnpm install
 pnpm dev
 ```
 
+If `pnpm` is unavailable or Corepack cannot write to a protected Node installation, use the package-manager fallback instead:
+
+```powershell
+cd frontend
+npx.cmd pnpm@11.7.0 install
+npx.cmd pnpm@11.7.0 dev
+```
+
 Open `http://127.0.0.1:3000`.
+
+Confirm the backend first at `http://127.0.0.1:8000/health`. If the console shows `Failed to fetch`, ensure the backend window is still running before refreshing the page.
+
+### Docker: local full stack
+
+With Docker Desktop running and `.env` configured, this starts the local API and web console without installing Python or pnpm locally:
+
+```powershell
+docker compose -f infra/docker-compose.yml up --build
+```
+
+The local Compose profile uses SQLite, Chroma, and local artifacts for demonstration. The production-oriented Compose file remains a separate deployment configuration and requires its documented identity, database, storage, and tenant settings.
 
 The Streamlit demo can still be started from the backend folder with:
 
