@@ -43,6 +43,10 @@ Assemble context -> Agent judgment -> Execute action -> Governance evidence
 2. [启动 FastAPI 和 Next.js 控制台](#start-local-services)。
 3. [验证 API 健康检查](#verify-local-services)。
 
+### 本地运行命令
+
+详细的 Windows 与 Docker 启动命令见下方[本地运行](#本地运行)；完成启动后，先访问 `http://127.0.0.1:8000/health`，再打开 `http://127.0.0.1:3000`。
+
 ## 演示与验证
 
 Use this path when reviewing the project for the first time:
@@ -226,26 +230,6 @@ When `ACCESS_PASSWORD` is configured, pass `X-Access-Password`.
 For multi-tenant API calls, pass `X-Tenant-ID`, `X-Org-ID`, and `X-Department-ID`; local defaults are used when these headers are absent.
 When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations until `ACCESS_PASSWORD` is configured.
 
-## 项目结构
-
-| Path | Purpose |
-| --- | --- |
-| `frontend/` | Next.js professional Agent console for context intake, chat, evidence, approvals, and audit status. |
-| `backend/app.py` | Streamlit workbench and local debug UI. |
-| `backend/api.py` | FastAPI control plane for chat, identity, readiness, action records, approvals, connectors, and audit data. |
-| `backend/core/` | Agent workflow, RAG, matcher, security, audit, tenancy, database, connectors, and tool execution modules. |
-| `data/` | Sample HR policy, resume, and JD documents used by the demo. |
-| `docs/` | Deployment notes, clean-install notes, AI coding workflow notes, and product screenshots. |
-| `docs/project/` | Archived project planning notes and delivery context. |
-| `evals/` | RAG evaluation dataset. |
-| `infra/` | Dockerfile and Docker Compose deployment assets. |
-| `var/` | Local runtime state such as SQLite, audit logs, generated artifacts, and Chroma indexes. |
-| `backend/scripts/` | Utility scripts for password hashing and RAG evaluation. |
-| `backend/tests/` | Unit tests for core behavior, API control plane, security, tenancy, and evaluation helpers. |
-| `AGENTS.md` | Agent operating guide, required checks, public repo rules, and review priorities. |
-
-Production gate details are tracked in [`docs/operations-readiness-gates.md`](docs/operations-readiness-gates.md), including external connector proof, object storage checks, migration expectations, monitoring alerts, and release-drill evidence.
-
 ## 部署与生产
 
 本地使用 Docker Compose、SQLite、Chroma 和本地工件；生产部署需配置受管数据库、对象存储、身份验证和连接器。
@@ -323,6 +307,26 @@ docker compose -f infra/docker-compose.yml up --build
 ```
 
 Open the web console at `http://127.0.0.1:3000`; the FastAPI control plane is exposed at `http://127.0.0.1:8000`.
+
+## 项目结构
+
+| Path | Purpose |
+| --- | --- |
+| `frontend/` | Next.js professional Agent console for context intake, chat, evidence, approvals, and audit status. |
+| `backend/app.py` | Streamlit workbench and local debug UI. |
+| `backend/api.py` | FastAPI control plane for chat, identity, readiness, action records, approvals, connectors, and audit data. |
+| `backend/core/` | Agent workflow, RAG, matcher, security, audit, tenancy, database, connectors, and tool execution modules. |
+| `data/` | Sample HR policy, resume, and JD documents used by the demo. |
+| `docs/` | Deployment notes, clean-install notes, AI coding workflow notes, and product screenshots. |
+| `docs/project/` | Archived project planning notes and delivery context. |
+| `evals/` | RAG evaluation dataset. |
+| `infra/` | Dockerfile and Docker Compose deployment assets. |
+| `var/` | Local runtime state such as SQLite, audit logs, generated artifacts, and Chroma indexes. |
+| `backend/scripts/` | Utility scripts for password hashing and RAG evaluation. |
+| `backend/tests/` | Unit tests for core behavior, API control plane, security, tenancy, and evaluation helpers. |
+| `AGENTS.md` | Agent operating guide, required checks, public repo rules, and review priorities. |
+
+Production gate details are tracked in [`docs/operations-readiness-gates.md`](docs/operations-readiness-gates.md), including external connector proof, object storage checks, migration expectations, monitoring alerts, and release-drill evidence.
 
 ## 相关文档与上线准备
 
