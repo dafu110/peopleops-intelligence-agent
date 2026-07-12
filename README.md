@@ -296,4 +296,7 @@ Open the web console at `http://127.0.0.1:3000`; the FastAPI control plane is ex
 - [Launch hardening checklist](docs/launch-hardening.md)
 - [ADR: Governed PeopleOps tool execution](docs/adr/0001-governed-peopleops-tools.md)
 - [ADR: Public repository quality gates](docs/adr/0002-public-quality-gates.md)
+- [ADR: Candidate assistance decision boundary](docs/adr/0003-candidate-decision-support-boundary.md)
+- [Agent specification](docs/agent-spec.md)
+- [Product evidence package](docs/product-evidence.md)
 - [Agent operating guide](AGENTS.md)
