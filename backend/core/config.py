@@ -25,6 +25,7 @@ class Settings:
     calendar_dir: Path
     ats_export_dir: Path
     access_password: Optional[str]
+    allow_insecure_local_auth: bool
     enterprise_mode: bool
     require_access_password: bool
     access_password_min_length: int
@@ -56,6 +57,9 @@ class Settings:
     trusted_sso_enabled: bool
     trusted_sso_user_header: str
     trusted_sso_role_header: str
+    trusted_sso_tenant_header: str
+    trusted_sso_org_header: str
+    trusted_sso_department_header: str
     oidc_enabled: bool
     oidc_issuer: Optional[str]
     oidc_audience: Optional[str]
@@ -163,6 +167,7 @@ def get_settings() -> Settings:
         calendar_dir=_path_env("CALENDAR_DIR", "var/runtime/calendar"),
         ats_export_dir=_path_env("ATS_EXPORT_DIR", "var/runtime/ats_exports"),
         access_password=os.getenv("ACCESS_PASSWORD"),
+        allow_insecure_local_auth=_bool_env("ALLOW_INSECURE_LOCAL_AUTH", False),
         enterprise_mode=enterprise_mode,
         require_access_password=_bool_env("REQUIRE_ACCESS_PASSWORD", enterprise_mode),
         access_password_min_length=_int_env("ACCESS_PASSWORD_MIN_LENGTH", 12),
@@ -202,6 +207,9 @@ def get_settings() -> Settings:
         trusted_sso_enabled=_bool_env("TRUSTED_SSO_ENABLED", False),
         trusted_sso_user_header=os.getenv("TRUSTED_SSO_USER_HEADER", "X-Authenticated-User"),
         trusted_sso_role_header=os.getenv("TRUSTED_SSO_ROLE_HEADER", "X-Authenticated-Role"),
+        trusted_sso_tenant_header=os.getenv("TRUSTED_SSO_TENANT_HEADER", "X-Authenticated-Tenant"),
+        trusted_sso_org_header=os.getenv("TRUSTED_SSO_ORG_HEADER", "X-Authenticated-Org"),
+        trusted_sso_department_header=os.getenv("TRUSTED_SSO_DEPARTMENT_HEADER", "X-Authenticated-Department"),
         oidc_enabled=_bool_env("OIDC_ENABLED", False),
         oidc_issuer=os.getenv("OIDC_ISSUER"),
         oidc_audience=os.getenv("OIDC_AUDIENCE"),

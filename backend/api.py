@@ -179,13 +179,23 @@ def tenant_context(
     )
 
 
+def default_tenant_context() -> TenantContext:
+    return TenantContext.from_headers(
+        tenant_id=None,
+        org_id=None,
+        department_id=None,
+        default_tenant_id=settings.default_tenant_id,
+        default_org_id=settings.default_org_id,
+        default_department_id=settings.default_department_id,
+    )
+
+
 def current_principal(
     request: Request,
     authorization: Optional[str] = Header(default=None),
     x_access_password: Optional[str] = Header(default=None),
     x_authenticated_user: Optional[str] = Header(default=None),
     x_authenticated_role: Optional[str] = Header(default=None),
-    scope: TenantContext = Depends(tenant_context),
 ) -> Principal:
     if settings.trusted_sso_enabled:
         username = (
@@ -202,6 +212,14 @@ def current_principal(
             raise HTTPException(status_code=401, detail="Missing trusted SSO user header")
         if role not in {"admin", "hrbp", "viewer"}:
             raise HTTPException(status_code=403, detail="Unsupported SSO role")
+        scope = TenantContext.from_headers(
+            tenant_id=request.headers.get(settings.trusted_sso_tenant_header),
+            org_id=request.headers.get(settings.trusted_sso_org_header),
+            department_id=request.headers.get(settings.trusted_sso_department_header),
+            default_tenant_id=settings.default_tenant_id,
+            default_org_id=settings.default_org_id,
+            default_department_id=settings.default_department_id,
+        )
         scoped_principal = Principal(username=username, role=role, **scope.as_dict())
         set_audit_context(actor=scoped_principal.username, **scoped_principal.scope())
         return scoped_principal
@@ -210,7 +228,7 @@ def current_principal(
         if scheme.lower() != "bearer" or not token:
             raise HTTPException(status_code=401, detail="Missing bearer token")
         try:
-            principal = authenticate_with_oidc(token, **scope.as_dict())
+            principal = authenticate_with_oidc(token)
         except Exception as exc:
             raise HTTPException(status_code=401, detail=f"Invalid bearer token: {exc}") from exc
         if principal is None:
@@ -219,7 +237,13 @@ def current_principal(
         return principal
     if settings.require_access_password and not settings.access_password:
         raise HTTPException(status_code=503, detail="ACCESS_PASSWORD is required by server configuration")
+    scope = default_tenant_context()
     if not settings.access_password:
+        if not settings.allow_insecure_local_auth:
+            raise HTTPException(status_code=503, detail="Authentication must be configured before serving requests")
+        client_host = request.client.host if request.client else ""
+        if client_host not in {"127.0.0.1", "::1", "testclient"}:
+            raise HTTPException(status_code=503, detail="Insecure local authentication only accepts loopback requests")
         set_audit_context(actor="local-admin", **scope.as_dict())
         return Principal(username="local-admin", role="admin", **scope.as_dict())
     principal = authenticate_with_password(x_access_password or "")

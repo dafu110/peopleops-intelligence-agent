@@ -12,7 +12,7 @@ It demonstrates a production-shaped AI agent loop for PeopleOps teams: collect H
 - **Real operator console**: Next.js workspace with intake, Agent chat, evidence, approvals, audit status, and readiness checks in one screen.
 - **Grounded HR policy RAG**: Chinese policy handbook retrieval with citations, Chroma persistence, manifest invalidation, and CI quality gates.
 - **Agent workflow beyond chat**: LangGraph routing across policy Q&A, resume/JD matching, and governed tool execution.
-- **Enterprise controls**: tenant headers, RBAC, access-password mode, PII redaction, approval gates, API rate limits, and hash-chained audit events.
+- **Enterprise controls**: identity-derived tenant scope, RBAC, access-password mode, PII redaction, approval gates, API rate limits, and hash-chained audit events.
 - **Deployment path**: Docker Compose assets plus PostgreSQL, Qdrant, object storage, SSO/OIDC, and connector readiness checks for production handoff.
 
 ### 阅读路径
@@ -224,8 +224,8 @@ Useful endpoints:
 - `GET /audit/integrity`
 
 When `ACCESS_PASSWORD` is configured, pass `X-Access-Password`.
-For multi-tenant API calls, pass `X-Tenant-ID`, `X-Org-ID`, and `X-Department-ID`; local defaults are used when these headers are absent.
-When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations until `ACCESS_PASSWORD` is configured.
+OIDC requests derive `tenant_id`、`org_id` 和 `department_id` from verified token claims; trusted SSO requests derive them from the configured gateway headers. Client-supplied `X-Tenant-ID`、`X-Org-ID` 和 `X-Department-ID` do not override identity scope.
+When no password, OIDC, or trusted SSO is configured, the API refuses protected operations unless the loopback-only demo switch `ALLOW_INSECURE_LOCAL_AUTH=true` is set explicitly.
 
 ## 部署与生产
 
@@ -235,7 +235,7 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 
 | Area | Local reference implementation | Production expectation |
 | --- | --- | --- |
-| Identity | Optional access password, roles, tenant headers, local defaults | SSO or OIDC with real bearer-token validation and gateway policy |
+| Identity | Access password or explicit loopback-only demo mode, identity-derived scope | SSO or OIDC with real bearer-token validation and gateway policy |
 | Database | SQLite runtime database | PostgreSQL with migrations, backups, and tenant-aware operational controls |
 | Vector search | Chroma policy index on local disk | Qdrant, pgvector, Milvus, or managed retrieval service with persistence and monitoring |
 | Files/artifacts | Local email drafts, calendar files, ATS export payloads | Object storage plus live connector probes and retention policies |
@@ -260,6 +260,7 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 | `ENTERPRISE_MODE` | `false` | Enables stricter production-readiness warnings |
 | `REQUIRE_ACCESS_PASSWORD` | `false` | Requires `ACCESS_PASSWORD` for API access |
 | `ACCESS_PASSWORD` | empty | Optional access password |
+| `ALLOW_INSECURE_LOCAL_AUTH` | `false` | Enables passwordless local demo access on loopback only; never enable in a deployed environment. |
 | `ACCESS_PASSWORD_MIN_LENGTH` | `12` | Minimum plain-text password length warning threshold |
 | `APP_DB_PATH` | `var/runtime/peopleops.sqlite3` | SQLite app database |
 | `AUDIT_LOG_PATH` | `var/runtime/audit/events.jsonl` | JSONL audit log |
@@ -288,7 +289,7 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 - Store `ACCESS_PASSWORD` as `pbkdf2_sha256$...`; plain text and legacy `sha256:` values are accepted for compatibility but reported in readiness warnings.
 - Generate a password hash with `python backend/scripts/hash_password.py`, then paste the output into `.env` as `ACCESS_PASSWORD`.
 - Use `TOOL_EXECUTION_MODE=approval` when candidate follow-up actions should create an auditable pending action instead of immediately generating email, calendar, or ATS artifacts.
-- Use `X-Tenant-ID`, `X-Org-ID`, and `X-Department-ID` on API calls to isolate action records, approvals, audit context, and downstream ATS payloads.
+- Map OIDC tenant, organization, and department claims, or configure the corresponding trusted SSO gateway headers; do not use client-supplied tenant headers as an authorization boundary.
 - Review `/approvals` before executing follow-up messages, rejection drafts, offer drafts, calendar invites, or ATS stage changes.
 - Review `/connectors` to see which enterprise HRIS, ATS, collaboration, mail, and calendar integrations are configured or still planned.
 - Use `/audit/events` for recent audit inspection; each record includes a request ID and a hash-chain pointer to make accidental tampering visible.

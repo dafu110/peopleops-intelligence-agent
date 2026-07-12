@@ -148,6 +148,7 @@ class IsolatedRuntimeMixin:
                 "ENTERPRISE_MODE",
                 "REQUIRE_ACCESS_PASSWORD",
                 "ACCESS_PASSWORD",
+                "ALLOW_INSECURE_LOCAL_AUTH",
                 "ACCESS_PASSWORD_MIN_LENGTH",
                 "AUDIT_HASH_CHAIN_ENABLED",
                 "API_RATE_LIMIT_PER_MINUTE",
@@ -166,6 +167,9 @@ class IsolatedRuntimeMixin:
                 "TRUSTED_SSO_ENABLED",
                 "TRUSTED_SSO_USER_HEADER",
                 "TRUSTED_SSO_ROLE_HEADER",
+                "TRUSTED_SSO_TENANT_HEADER",
+                "TRUSTED_SSO_ORG_HEADER",
+                "TRUSTED_SSO_DEPARTMENT_HEADER",
                 "OIDC_ENABLED",
                 "OIDC_ISSUER",
                 "OIDC_AUDIENCE",
@@ -188,6 +192,7 @@ class IsolatedRuntimeMixin:
         os.environ.pop("ENTERPRISE_MODE", None)
         os.environ.pop("REQUIRE_ACCESS_PASSWORD", None)
         os.environ.pop("ACCESS_PASSWORD", None)
+        os.environ["ALLOW_INSECURE_LOCAL_AUTH"] = "true"
         os.environ.pop("ACCESS_PASSWORD_MIN_LENGTH", None)
         os.environ.pop("AUDIT_HASH_CHAIN_ENABLED", None)
         os.environ.pop("API_RATE_LIMIT_PER_MINUTE", None)
@@ -206,6 +211,9 @@ class IsolatedRuntimeMixin:
         os.environ.pop("TRUSTED_SSO_ENABLED", None)
         os.environ.pop("TRUSTED_SSO_USER_HEADER", None)
         os.environ.pop("TRUSTED_SSO_ROLE_HEADER", None)
+        os.environ.pop("TRUSTED_SSO_TENANT_HEADER", None)
+        os.environ.pop("TRUSTED_SSO_ORG_HEADER", None)
+        os.environ.pop("TRUSTED_SSO_DEPARTMENT_HEADER", None)
         os.environ.pop("OIDC_ENABLED", None)
         os.environ.pop("OIDC_ISSUER", None)
         os.environ.pop("OIDC_AUDIENCE", None)
@@ -538,7 +546,7 @@ class ApiControlPlaneTests(IsolatedRuntimeMixin, unittest.TestCase):
 
             me = client.get("/me", headers={"X-Tenant-ID": "tenant-a", "X-Org-ID": "org-a"})
             self.assertEqual(me.status_code, 200)
-            self.assertEqual(me.json()["tenant_id"], "tenant-a")
+            self.assertEqual(me.json()["tenant_id"], "default")
 
     def test_chat_returns_service_error_when_agent_runtime_is_missing(self):
         from fastapi import HTTPException
@@ -686,7 +694,8 @@ class ApiControlPlaneTests(IsolatedRuntimeMixin, unittest.TestCase):
                 headers={
                     "X-Authenticated-User": "mei@example.com",
                     "X-Authenticated-Role": "hrbp",
-                    "X-Tenant-ID": "tenant-sso",
+                    "X-Authenticated-Tenant": "tenant-sso",
+                    "X-Tenant-ID": "spoofed-tenant",
                 },
             )
             self.assertEqual(me.status_code, 200)
@@ -718,6 +727,7 @@ class ApiControlPlaneTests(IsolatedRuntimeMixin, unittest.TestCase):
                 "sub": "user-123",
                 "email": "oidc@example.com",
                 "role": "admin",
+                "tenant_id": "tenant-oidc",
                 "aud": "peopleops-api",
                 "iss": "https://issuer.example.com",
             },
@@ -729,11 +739,24 @@ class ApiControlPlaneTests(IsolatedRuntimeMixin, unittest.TestCase):
             missing = client.get("/me")
             self.assertEqual(missing.status_code, 401)
 
-            me = client.get("/me", headers={"Authorization": f"Bearer {token}", "X-Tenant-ID": "tenant-oidc"})
+            me = client.get("/me", headers={"Authorization": f"Bearer {token}", "X-Tenant-ID": "spoofed-tenant"})
             self.assertEqual(me.status_code, 200)
             self.assertEqual(me.json()["username"], "oidc@example.com")
             self.assertEqual(me.json()["role"], "admin")
             self.assertEqual(me.json()["tenant_id"], "tenant-oidc")
+
+    def test_unconfigured_local_auth_is_disabled_without_explicit_opt_in(self):
+        from fastapi.testclient import TestClient
+        import api
+
+        os.environ["ALLOW_INSECURE_LOCAL_AUTH"] = "false"
+        get_settings.cache_clear()
+        api = importlib.reload(api)
+
+        with TestClient(api.app) as client:
+            response = client.get("/me")
+
+        self.assertEqual(response.status_code, 503)
 
     def test_api_rate_limit_can_be_enforced(self):
         from fastapi.testclient import TestClient

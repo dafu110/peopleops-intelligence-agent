@@ -5,6 +5,7 @@ import jwt
 
 from .config import get_settings
 from .security import verify_password
+from .tenancy import TenantContext
 
 
 @dataclass(frozen=True)
@@ -37,7 +38,7 @@ def authenticate_with_password(password: str) -> Principal | None:
     return None
 
 
-def authenticate_with_oidc(token: str, *, tenant_id: str, org_id: str, department_id: str) -> Principal | None:
+def authenticate_with_oidc(token: str) -> Principal | None:
     settings = get_settings()
     if not settings.oidc_enabled or not token:
         return None
@@ -73,7 +74,20 @@ def authenticate_with_oidc(token: str, *, tenant_id: str, org_id: str, departmen
         return None
     if role not in ROLE_PERMISSIONS:
         role = settings.oidc_default_role if settings.oidc_default_role in ROLE_PERMISSIONS else "viewer"
-    return Principal(username=username, role=role, tenant_id=tenant_id, org_id=org_id, department_id=department_id)
+    scope = TenantContext.from_headers(
+        tenant_id=_claim_value(payload, "tenant_id"),
+        org_id=_claim_value(payload, "org_id"),
+        department_id=_claim_value(payload, "department_id"),
+        default_tenant_id=settings.default_tenant_id,
+        default_org_id=settings.default_org_id,
+        default_department_id=settings.default_department_id,
+    )
+    return Principal(username=username, role=role, **scope.as_dict())
+
+
+def _claim_value(payload: dict, name: str) -> str | None:
+    value = payload.get(name)
+    return value if isinstance(value, str) else None
 
 
 def has_permission(principal: Principal, permission: str) -> bool:
