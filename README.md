@@ -152,6 +152,10 @@ The product UI intentionally avoids duplicate search boxes: evidence retrieval i
 - FastAPI control plane in `backend/api.py` for health, readiness, identity, chat, action records, approvals, connectors, and audit endpoints.
 - Deployment assets: `infra/Dockerfile`, `infra/docker-compose.yml`, `.devcontainer`, and deployment notes under `docs/`.
 
+## 架构与实现
+
+Next.js 控制台通过 FastAPI 控制面调用 LangGraph 工作流，策略 RAG、简历匹配、审批队列和审计链共同构成可追溯的 PeopleOps 操作闭环。
+
 ## 测试与验证
 
 - GitHub Actions runs backend compile checks, unit tests, RAG dataset validation, RAG fixture scoring, frontend install/build, and real retriever evaluation.
@@ -162,7 +166,7 @@ The product UI intentionally avoids duplicate search boxes: evidence retrieval i
 
 The CI badge above is the current status signal. To reproduce the local gates, follow the commands in [the agent operating guide](AGENTS.md); a dated local validation record is kept in [the clean-install guide](docs/clean-install-and-test.md).
 
-## 架构与实现
+### 架构细节
 
 ```mermaid
 flowchart LR
@@ -241,6 +245,10 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 | `AGENTS.md` | Agent operating guide, required checks, public repo rules, and review priorities. |
 
 Production gate details are tracked in [`docs/operations-readiness-gates.md`](docs/operations-readiness-gates.md), including external connector proof, object storage checks, migration expectations, monitoring alerts, and release-drill evidence.
+
+## 部署与生产
+
+本地使用 Docker Compose、SQLite、Chroma 和本地工件；生产部署需配置受管数据库、对象存储、身份验证和连接器。
 
 ## 生产边界
 
