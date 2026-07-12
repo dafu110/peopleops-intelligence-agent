@@ -1,13 +1,13 @@
 ﻿# PeopleOps Intelligence Agent
 
-PeopleOps Intelligence Agent is an AI-native HRBP workbench for policy Q&A, resume/JD matching, candidate follow-up actions, approvals, audit evidence, and local ATS-style records. It is designed as a practical enterprise-console reference project rather than a single-purpose RAG demo.
-
 [![ci](https://github.com/dafu110/peopleops-intelligence-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/dafu110/peopleops-intelligence-agent/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+PeopleOps Intelligence Agent is an AI-native HRBP workbench for policy Q&A, resume/JD matching, candidate follow-up actions, approvals, audit evidence, and local ATS-style records. It is designed as a practical enterprise-console reference project rather than a single-purpose RAG demo.
+
 It demonstrates a production-shaped AI agent loop for PeopleOps teams: collect HR context, route the request, retrieve grounded policy evidence, run governed candidate actions, and leave auditable traces for review.
 
-## Portfolio Highlights
+## 核心能力
 
 - **Real operator console**: Next.js workspace with intake, Agent chat, evidence, approvals, audit status, and readiness checks in one screen.
 - **Grounded HR policy RAG**: Chinese policy handbook retrieval with citations, Chroma persistence, manifest invalidation, and CI quality gates.
@@ -15,7 +15,7 @@ It demonstrates a production-shaped AI agent loop for PeopleOps teams: collect H
 - **Enterprise controls**: tenant headers, RBAC, access-password mode, PII redaction, approval gates, API rate limits, and hash-chained audit events.
 - **Deployment path**: Docker Compose assets plus PostgreSQL, Qdrant, object storage, SSO/OIDC, and connector readiness checks for production handoff.
 
-## Reading Guide
+## 阅读路径
 
 Start here if you are reviewing the project for the first time:
 
@@ -25,7 +25,7 @@ Start here if you are reviewing the project for the first time:
 4. **Core Capabilities**: which agent, RAG, governance, and persistence pieces are included.
 5. **Architecture, API, and Configuration**: implementation and deployment details.
 
-## Product Snapshot
+## 界面预览
 
 The primary product surface is now a Next.js web console backed by the FastAPI control plane. It uses a professional three-panel workbench: context intake on the left, a single Agent conversation workspace in the center, and evidence, approvals, runtime state, and audit signals on the right.
 
@@ -37,7 +37,7 @@ Assemble context -> Agent judgment -> Execute action -> Governance evidence
 
 ![PeopleOps Intelligence Console running locally](docs/screenshots/peopleops-intelligence-console.png)
 
-## 60-Second Demo Flow
+## 演示与验证
 
 Use this path when reviewing the project for the first time:
 
@@ -50,7 +50,7 @@ Use this path when reviewing the project for the first time:
 
 Full walkthrough: [`docs/demo-flow.md`](docs/demo-flow.md).
 
-## Quick Start
+## 快速开始
 
 Create the local configuration once. Keep `.env` out of source control and replace the sample model values before sending real Agent requests:
 
@@ -62,7 +62,7 @@ if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 2. [Start the FastAPI API and Next.js console](#start-local-services).
 3. [Verify the API health check before opening the console](#verify-local-services).
 
-### Windows: FastAPI + Next.js
+### Windows：FastAPI + Next.js
 
 Run the FastAPI backend in one PowerShell window. The commands call the virtual environment's Python directly, so PowerShell execution policy does not need to allow `Activate.ps1`:
 
@@ -109,7 +109,7 @@ Open `http://127.0.0.1:3000`.
 
 Confirm the backend first at `http://127.0.0.1:8000/health`. If the console shows `Failed to fetch`, ensure the backend window is still running before refreshing the page.
 
-### Docker: local full stack
+### Docker：本地全栈
 
 With Docker Desktop running and `.env` configured, this starts the local API and web console without installing Python or pnpm locally:
 
@@ -128,7 +128,7 @@ python -m streamlit run app.py
 
 On Windows, if dependency installation fails while unpacking `torch` because the repository path is too deep, use the short-path setup in [`docs/clean-install-and-test.md`](docs/clean-install-and-test.md).
 
-## Closed-Loop Experience
+## 闭环体验
 
 The app is organized around the daily flow of an HR operator.
 
@@ -139,7 +139,7 @@ The app is organized around the daily flow of an HR operator.
 
 The product UI intentionally avoids duplicate search boxes: evidence retrieval is shown as part of the Agent workflow rather than exposed as a second manual query path.
 
-## Core Capabilities
+## 能力详情
 
 - AI agent workflow in `backend/core/workflow.py` with intent routing for RAG, resume analysis, and tool execution.
 - Enterprise policy retrieval in `backend/core/rag_engine.py` with persistent Chroma indexing and page-aware citations.
@@ -150,7 +150,7 @@ The product UI intentionally avoids duplicate search boxes: evidence retrieval i
 - FastAPI control plane in `backend/api.py` for health, readiness, identity, chat, action records, approvals, connectors, and audit endpoints.
 - Deployment assets: `infra/Dockerfile`, `infra/docker-compose.yml`, `.devcontainer`, and deployment notes under `docs/`.
 
-## Quality Signals
+## 测试与验证
 
 - GitHub Actions runs backend compile checks, unit tests, RAG dataset validation, RAG fixture scoring, frontend install/build, and real retriever evaluation.
 - Agent golden traces cover RAG routing, resume screening, missing-context handling, scheduling, and candidate-stage tool flows.
@@ -160,7 +160,7 @@ The product UI intentionally avoids duplicate search boxes: evidence retrieval i
 
 The CI badge above is the current status signal. To reproduce the local gates, follow the commands in [the agent operating guide](AGENTS.md); a dated local validation record is kept in [the clean-install guide](docs/clean-install-and-test.md).
 
-## Architecture
+## 核心架构
 
 ```mermaid
 flowchart LR
@@ -197,7 +197,7 @@ Engineering services
   `-- calendar ICS artifacts
 ```
 
-## API Backend
+## API 与本地运行
 
 ```powershell
 cd backend
@@ -220,7 +220,7 @@ When `ACCESS_PASSWORD` is configured, pass `X-Access-Password`.
 For multi-tenant API calls, pass `X-Tenant-ID`, `X-Org-ID`, and `X-Department-ID`; local defaults are used when these headers are absent.
 When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations until `ACCESS_PASSWORD` is configured.
 
-## Project Map
+## 项目结构
 
 | Path | Purpose |
 | --- | --- |
@@ -240,7 +240,7 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 
 Production gate details are tracked in [`docs/operations-readiness-gates.md`](docs/operations-readiness-gates.md), including external connector proof, object storage checks, migration expectations, monitoring alerts, and release-drill evidence.
 
-## Demo vs Production Boundary
+## 生产边界
 
 This repository is intentionally clear about what is implemented locally and what must be configured for a live enterprise deployment.
 
@@ -253,7 +253,7 @@ This repository is intentionally clear about what is implemented locally and wha
 | Tool actions | `dry_run`, `approval`, or local artifact creation | `approval` before live mode; compensation and rollback evidence required |
 | Observability | Readiness endpoint, audit hash chain, local tests/evals | Centralized logs, metrics, alerts, error budgets, and release-drill evidence |
 
-## Configuration
+## 配置
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -293,7 +293,7 @@ This repository is intentionally clear about what is implemented locally and wha
 | `SMTP_PORT` | `587` | SMTP port |
 | `SMTP_FROM` | `hr@example.com` | Sender for generated follow-up email |
 
-## Enterprise Controls
+## 生产控制
 
 - Set `ENTERPRISE_MODE=true` and `REQUIRE_ACCESS_PASSWORD=true` before exposing the API beyond a local demo.
 - Store `ACCESS_PASSWORD` as `pbkdf2_sha256$...`; plain text and legacy `sha256:` values are accepted for compatibility but reported in readiness warnings.
@@ -306,7 +306,7 @@ This repository is intentionally clear about what is implemented locally and wha
 - Use `/audit/integrity` to verify the audit hash chain before exporting evidence or closing an incident review.
 - Treat SQLite, local files, and local Chroma as a reference implementation. For production, move state to PostgreSQL, object storage, and a managed vector/search service with tenant isolation.
 
-## Docker
+## Docker 运行
 
 ```powershell
 docker compose -f infra/docker-compose.yml up --build
@@ -314,7 +314,7 @@ docker compose -f infra/docker-compose.yml up --build
 
 Open the web console at `http://127.0.0.1:3000`; the FastAPI control plane is exposed at `http://127.0.0.1:8000`.
 
-## Launch Readiness
+## 相关文档与上线准备
 
 - [Launch hardening checklist](docs/launch-hardening.md)
 - [ADR: Governed PeopleOps tool execution](docs/adr/0001-governed-peopleops-tools.md)
@@ -324,6 +324,6 @@ Open the web console at `http://127.0.0.1:3000`; the FastAPI control plane is ex
 - [Product evidence package](docs/product-evidence.md)
 - [Agent operating guide](AGENTS.md)
 
-## License
+## 许可证
 
 MIT. See [LICENSE](LICENSE).
