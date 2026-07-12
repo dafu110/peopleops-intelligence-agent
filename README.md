@@ -207,12 +207,9 @@ Engineering services
   `-- calendar ICS artifacts
 ```
 
-### API 与本地运行
+### API 与身份验证
 
-```powershell
-cd backend
-python -m uvicorn api:app --host 0.0.0.0 --port 8000
-```
+本地 API 启动命令见[本地运行](#本地运行)。
 
 Useful endpoints:
 
@@ -232,11 +229,9 @@ When `REQUIRE_ACCESS_PASSWORD=true`, the API refuses authenticated operations un
 
 ## 部署与生产
 
-本地使用 Docker Compose、SQLite、Chroma 和本地工件；生产部署需配置受管数据库、对象存储、身份验证和连接器。
-
 ## 生产边界
 
-This repository is intentionally clear about what is implemented locally and what must be configured for a live enterprise deployment.
+下表区分本地参考实现与企业生产部署所需的受管数据库、对象存储、身份验证和连接器。
 
 | Area | Local reference implementation | Production expectation |
 | --- | --- | --- |
@@ -302,11 +297,7 @@ This repository is intentionally clear about what is implemented locally and wha
 
 ### Docker 运行
 
-```powershell
-docker compose -f infra/docker-compose.yml up --build
-```
-
-Open the web console at `http://127.0.0.1:3000`; the FastAPI control plane is exposed at `http://127.0.0.1:8000`.
+Docker 本地全栈启动命令见[本地运行](#本地运行)；它使用表中列出的本地参考实现，不应作为生产部署配置。
 
 ## 项目结构
 
