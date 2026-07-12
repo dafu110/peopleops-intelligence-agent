@@ -3,6 +3,7 @@
 PeopleOps Intelligence Agent is an AI-native HRBP workbench for policy Q&A, resume/JD matching, candidate follow-up actions, approvals, audit evidence, and local ATS-style records. It is designed as a practical enterprise-console reference project rather than a single-purpose RAG demo.
 
 [![ci](https://github.com/dafu110/peopleops-intelligence-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/dafu110/peopleops-intelligence-agent/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 It demonstrates a production-shaped AI agent loop for PeopleOps teams: collect HR context, route the request, retrieve grounded policy evidence, run governed candidate actions, and leave auditable traces for review.
 
@@ -57,15 +58,20 @@ Create the local configuration once. Keep `.env` out of source control and repla
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
+1. [Install the backend and frontend dependencies](#install-local-dependencies).
+2. [Start the FastAPI API and Next.js console](#start-local-services).
+3. [Verify the API health check before opening the console](#verify-local-services).
+
 ### Windows: FastAPI + Next.js
 
 Run the FastAPI backend in one PowerShell window. The commands call the virtual environment's Python directly, so PowerShell execution policy does not need to allow `Activate.ps1`:
+
+<a id="install-local-dependencies"></a>
 
 ```powershell
 cd backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8000
 ```
 
 Run the professional frontend in a second PowerShell window:
@@ -73,6 +79,19 @@ Run the professional frontend in a second PowerShell window:
 ```powershell
 cd frontend
 pnpm install
+```
+
+<a id="start-local-services"></a>
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8000
+```
+
+Run the professional frontend in a second PowerShell window:
+
+```powershell
+cd frontend
 pnpm dev
 ```
 
@@ -85,6 +104,8 @@ npx.cmd pnpm@11.7.0 dev
 ```
 
 Open `http://127.0.0.1:3000`.
+
+<a id="verify-local-services"></a>
 
 Confirm the backend first at `http://127.0.0.1:8000/health`. If the console shows `Failed to fetch`, ensure the backend window is still running before refreshing the page.
 
@@ -136,6 +157,8 @@ The product UI intentionally avoids duplicate search boxes: evidence retrieval i
 - RAG evals require 100% pass rate in CI with keyword coverage, citation correctness, PII leakage, and forbidden-term checks.
 - Production readiness docs cover identity, managed state, object storage, connector configuration, eval reports, and rollback signals.
 - Public hygiene checks block tracked secrets, generated runtime state, stale README screenshots, mojibake markers, invalid JSONL fixtures, and broken local Markdown links.
+
+The CI badge above is the current status signal. To reproduce the local gates, follow the commands in [the agent operating guide](AGENTS.md); a dated local validation record is kept in [the clean-install guide](docs/clean-install-and-test.md).
 
 ## Architecture
 
@@ -300,3 +323,7 @@ Open the web console at `http://127.0.0.1:3000`; the FastAPI control plane is ex
 - [Agent specification](docs/agent-spec.md)
 - [Product evidence package](docs/product-evidence.md)
 - [Agent operating guide](AGENTS.md)
+
+## License
+
+MIT. See [LICENSE](LICENSE).
