@@ -141,6 +141,15 @@ export type OperationsSummary = {
   tool_execution_count: number;
   tool_status_counts: Record<string, number>;
   approval_status_counts: Record<string, number>;
+  operator_metrics?: {
+    candidate_assistance_tasks: number;
+    adoption_rate: number;
+    human_rewrite_rate: number;
+    approval_duration_seconds: number;
+    citation_open_rate: number;
+    sample_counts: Record<string, number>;
+    failure_reasons: Record<string, number>;
+  };
   recent_failures: {
     tasks: Array<Record<string, unknown>>;
     tools: Array<Record<string, unknown>>;
@@ -245,12 +254,24 @@ export function getProductionChecks(accessPassword: string, live = false) {
 
 export function transitionApproval(
   approvalId: number,
-  action: "approve" | "reject" | "execute",
+  action: "submit" | "approve" | "reject" | "execute" | "retry",
   accessPassword: string,
 ) {
   return requestJson<ActionRecord>(`/approvals/${approvalId}/${action}`, {
     method: "POST",
     accessPassword,
+  });
+}
+
+export function recordOperatorEvent(
+  taskId: string,
+  eventType: "candidate.adopted" | "candidate.rewritten" | "citation.shown" | "citation.opened",
+  accessPassword: string,
+) {
+  return requestJson<{ id: number; task_id: string; event_type: string; duplicate: boolean }>(`/tasks/${taskId}/operator-events`, {
+    method: "POST",
+    accessPassword,
+    body: JSON.stringify({ event_type: eventType }),
   });
 }
 

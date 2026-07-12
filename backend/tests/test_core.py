@@ -38,6 +38,46 @@ class MatcherNormalizationTests(unittest.TestCase):
         self.assertEqual(result["cons"], ["No people management"])
 
 
+class CandidateAssistanceSafetyTests(unittest.TestCase):
+    def test_candidate_assistance_redacts_pii_and_removes_decision_language(self):
+        from core.candidate_assistance import render_candidate_assistance
+
+        reply = render_candidate_assistance(
+            resume_text="候选人邮箱 alice@example.com，有 Python 项目经验。",
+            jd_text="需要 Python API 经验。",
+            analysis={
+                "pros": ["建议录用：具备 Python 项目经验"],
+                "cons": ["缺少 API 规模与线上稳定性证据"],
+            },
+        )
+
+        self.assertNotIn("alice@example.com", reply)
+        self.assertNotIn("建议录用", reply)
+        self.assertIn("证据来源", reply)
+        self.assertIn("待确认项", reply)
+        self.assertIn("HRBP", reply)
+
+    def test_candidate_assistance_refuses_when_resume_or_jd_is_missing(self):
+        from core.candidate_assistance import render_candidate_assistance
+
+        reply = render_candidate_assistance(resume_text="", jd_text="需要 Python", analysis={})
+
+        self.assertIn("缺少候选人简历", reply)
+        self.assertIn("不形成匹配结论", reply)
+
+    def test_candidate_assistance_removes_protected_trait_language(self):
+        from core.candidate_assistance import render_candidate_assistance
+
+        reply = render_candidate_assistance(
+            resume_text="候选人有 Python 经验。",
+            jd_text="需要 Python 经验。",
+            analysis={"pros": ["年龄较小，适合高强度岗位"], "cons": []},
+        )
+
+        self.assertNotIn("年龄较小", reply)
+        self.assertIn("受保护特征", reply)
+
+
 class SecurityTests(unittest.TestCase):
     def test_redact_pii_masks_common_identifiers(self):
         text = "phone 13812345678, email test@example.com, id 110101199003071234"
@@ -224,7 +264,7 @@ class ToolExecutionTests(IsolatedRuntimeMixin, unittest.TestCase):
         self.assertEqual(result.metadata["ats_export_path"], "dry_run")
         self.assertIsInstance(result.metadata["approval_request_id"], int)
         self.assertEqual(list_interview_actions(limit=1)[0]["status"], "PENDING_APPROVAL")
-        self.assertEqual(list_approval_requests(limit=1)[0]["status"], "PENDING")
+        self.assertEqual(list_approval_requests(limit=1)[0]["status"], "DRAFT")
 
     def test_approval_status_transitions_are_enforced(self):
         os.environ["TOOL_EXECUTION_MODE"] = "approval"
@@ -232,6 +272,8 @@ class ToolExecutionTests(IsolatedRuntimeMixin, unittest.TestCase):
         result = schedule_interview("Dana", "2026-06-21 15:00", candidate_email="dana@example.com")
         approval_id = result.metadata["approval_request_id"]
 
+        submitted = update_approval_status(approval_id, tenant_id="default", status="PENDING", approved_by="requester")
+        self.assertEqual(submitted["status"], "PENDING")
         approved = update_approval_status(approval_id, tenant_id="default", status="APPROVED", approved_by="reviewer")
         self.assertEqual(approved["status"], "APPROVED")
         executed = update_approval_status(approval_id, tenant_id="default", status="EXECUTED", approved_by="reviewer")
@@ -404,8 +446,33 @@ class DatabaseAdapterTests(unittest.TestCase):
         self.assertNotIn("RETURNING id", sql)
         self.assertEqual(params["p0"], "task-1")
 
+    def test_approval_state_machine_supports_draft_submission_and_failure_retry(self):
+        from core.database import APPROVAL_TRANSITIONS
+
+        self.assertEqual(APPROVAL_TRANSITIONS["DRAFT"], {"PENDING"})
+        self.assertEqual(APPROVAL_TRANSITIONS["PENDING"], {"APPROVED", "REJECTED"})
+        self.assertEqual(APPROVAL_TRANSITIONS["APPROVED"], {"EXECUTED", "FAILED"})
+        self.assertEqual(APPROVAL_TRANSITIONS["FAILED"], {"PENDING"})
+
 
 class ApiControlPlaneTests(IsolatedRuntimeMixin, unittest.TestCase):
+    def test_operator_events_are_tenant_scoped_and_idempotent(self):
+        from fastapi.testclient import TestClient
+        from core.database import create_agent_task_run
+        import api
+
+        api = importlib.reload(api)
+        create_agent_task_run(task_id="task-operator-event", thread_id="thread-1", input_text="candidate review")
+        with TestClient(api.app) as client:
+            first = client.post("/tasks/task-operator-event/operator-events", json={"event_type": "candidate.adopted"})
+            second = client.post("/tasks/task-operator-event/operator-events", json={"event_type": "candidate.adopted"})
+
+        self.assertEqual(first.status_code, 200)
+        self.assertFalse(first.json()["duplicate"])
+        self.assertEqual(second.status_code, 200)
+        self.assertTrue(second.json()["duplicate"])
+        self.assertEqual(first.json()["id"], second.json()["id"])
+
     def test_health_and_audit_endpoints_do_not_require_agent_runtime(self):
         from fastapi.testclient import TestClient
         import api
@@ -451,11 +518,15 @@ class ApiControlPlaneTests(IsolatedRuntimeMixin, unittest.TestCase):
             self.assertEqual(operations.status_code, 200)
             self.assertIn("task_success_rate", operations.json())
             self.assertIn("tool_status_counts", operations.json())
+            self.assertIn("operator_metrics", operations.json())
 
             os.environ["TOOL_EXECUTION_MODE"] = "approval"
             get_settings.cache_clear()
             created = schedule_interview("Erin", "2026-06-24 10:00", candidate_email="erin@example.com")
             approval_id = created.metadata["approval_request_id"]
+            submitted = client.post(f"/approvals/{approval_id}/submit")
+            self.assertEqual(submitted.status_code, 200)
+            self.assertEqual(submitted.json()["status"], "PENDING")
             approved = client.post(f"/approvals/{approval_id}/approve")
             self.assertEqual(approved.status_code, 200)
             self.assertEqual(approved.json()["status"], "APPROVED")
@@ -732,6 +803,11 @@ class RagEvaluationTests(unittest.TestCase):
 
         self.assertGreaterEqual(len(cases), 10)
         self.assertIn("update_candidate_stage", {item["name"] for item in list_registered_tools()})
+        self.assertEqual(evaluate(), 0)
+
+    def test_candidate_assistance_safety_eval_passes(self):
+        from scripts.evaluate_candidate_assistance import evaluate
+
         self.assertEqual(evaluate(), 0)
 
     def test_dataset_contains_representative_fixture_cases(self):

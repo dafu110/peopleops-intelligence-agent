@@ -1571,10 +1571,19 @@ input:focus {
 }
 
 .citation-row {
+  width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #f8fbff;
+  color: inherit;
+  cursor: pointer;
   padding: 10px;
+  text-align: left;
+}
+
+.citation-row:hover {
+  border-color: var(--blue-line);
+  background: var(--blue-soft);
 }
 
 .citation-row strong {

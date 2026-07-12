@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
+from datetime import datetime
+import json
 import time
 from typing import List, Optional
 from uuid import uuid4
@@ -98,6 +100,10 @@ class ChatResponse(BaseModel):
 
 class CompensationRequest(BaseModel):
     reason: str = Field(..., min_length=3, max_length=1_000)
+
+
+class OperatorEventRequest(BaseModel):
+    event_type: str = Field(..., pattern=r"^(candidate\.adopted|candidate\.rewritten|citation\.shown|citation\.opened)$")
 
 
 class DocumentExtractResponse(BaseModel):
@@ -457,6 +463,38 @@ def operations_summary(
     ]
     avg_latency_ms = sum(int(item.get("latency_ms", 0)) for item in trace_metrics) / max(len(trace_metrics), 1)
     total_estimated_tokens = sum(int(item.get("estimated_total_tokens", 0)) for item in trace_metrics)
+    task_events = [
+        event
+        for task in task_runs
+        for event in list_agent_task_events(task["task_id"], tenant_id=principal.tenant_id, limit=200)
+    ]
+    operator_events = [event for event in task_events if event["event_type"] in {"candidate.adopted", "candidate.rewritten", "citation.shown", "citation.opened"}]
+    candidate_tasks = [task for task in task_runs if task.get("intent") == "resume"]
+    adopted = sum(event["event_type"] == "candidate.adopted" for event in operator_events)
+    rewritten = sum(event["event_type"] == "candidate.rewritten" for event in operator_events)
+    citations_shown = sum(event["event_type"] == "citation.shown" for event in operator_events)
+    citations_opened = sum(event["event_type"] == "citation.opened" for event in operator_events)
+    terminal_approvals = [row for row in approval_runs if row.get("status") in {"APPROVED", "REJECTED", "EXECUTED", "FAILED"}]
+    durations = []
+    for row in terminal_approvals:
+        try:
+            durations.append((datetime.fromisoformat(str(row["updated_at"])) - datetime.fromisoformat(str(row["created_at"]))).total_seconds())
+        except (KeyError, TypeError, ValueError):
+            continue
+
+    def failure_reason(row: dict, key: str) -> str:
+        payload = row.get(key) or ""
+        try:
+            parsed = json.loads(payload)
+        except (TypeError, json.JSONDecodeError):
+            parsed = {}
+        error = parsed.get("error", parsed) if isinstance(parsed, dict) else {}
+        return str(error.get("code") or error.get("message") or "unknown") if isinstance(error, dict) else "unknown"
+
+    failure_reasons = Counter(
+        [failure_reason(row, "error") for row in failed_tasks]
+        + [failure_reason(row, "error_json") for row in failed_tools]
+    )
 
     return {
         "tenant_id": principal.tenant_id,
@@ -473,6 +511,19 @@ def operations_summary(
         "tool_execution_count": len(tool_runs),
         "tool_status_counts": counts_by_status(tool_runs),
         "approval_status_counts": counts_by_status(approval_runs),
+        "operator_metrics": {
+            "candidate_assistance_tasks": len(candidate_tasks),
+            "adoption_rate": adopted / max(len(candidate_tasks), 1),
+            "human_rewrite_rate": rewritten / max(adopted + rewritten, 1),
+            "approval_duration_seconds": sum(durations) / max(len(durations), 1),
+            "citation_open_rate": citations_opened / max(citations_shown, 1),
+            "sample_counts": {
+                "candidate_feedback": adopted + rewritten,
+                "approval_duration": len(durations),
+                "citations": citations_shown,
+            },
+            "failure_reasons": dict(failure_reasons),
+        },
         "recent_failures": {
             "tasks": [
                 {
@@ -782,6 +833,11 @@ def approve_approval(approval_id: int, principal: Principal = Depends(current_pr
     return transition_approval(approval_id, "APPROVED", principal)
 
 
+@app.post("/approvals/{approval_id}/submit")
+def submit_approval(approval_id: int, principal: Principal = Depends(current_principal)) -> dict:
+    return transition_approval(approval_id, "PENDING", principal)
+
+
 @app.post("/approvals/{approval_id}/reject")
 def reject_approval(approval_id: int, principal: Principal = Depends(current_principal)) -> dict:
     return transition_approval(approval_id, "REJECTED", principal)
@@ -790,6 +846,38 @@ def reject_approval(approval_id: int, principal: Principal = Depends(current_pri
 @app.post("/approvals/{approval_id}/execute")
 def execute_approval(approval_id: int, principal: Principal = Depends(current_principal)) -> dict:
     return transition_approval(approval_id, "EXECUTED", principal)
+
+
+@app.post("/approvals/{approval_id}/retry")
+def retry_approval(approval_id: int, principal: Principal = Depends(current_principal)) -> dict:
+    return transition_approval(approval_id, "PENDING", principal)
+
+
+@app.post("/tasks/{task_id}/operator-events")
+def record_operator_event(
+    task_id: str,
+    request: OperatorEventRequest,
+    principal: Principal = Depends(current_principal),
+) -> dict:
+    if request.event_type.startswith("candidate."):
+        require_permission(principal, "resume")
+    else:
+        require_permission(principal, "chat")
+    task = get_agent_task_run(task_id)
+    if task is None or task.get("tenant_id") != principal.tenant_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+    existing_events = list_agent_task_events(task_id, tenant_id=principal.tenant_id, limit=200)
+    existing = next((event for event in existing_events if event["event_type"] == request.event_type), None)
+    if existing:
+        return {"id": existing["id"], "task_id": task_id, "event_type": request.event_type, "duplicate": True}
+    event_id = create_agent_task_event(
+        task_id=task_id,
+        event_type=request.event_type,
+        payload={"operator": principal.username},
+        **principal.scope(),
+    )
+    write_audit_event("operator.metric", {"task_id": task_id, "event_type": request.event_type, **principal.scope()})
+    return {"id": event_id, "task_id": task_id, "event_type": request.event_type, "duplicate": False}
 
 
 @app.get("/audit/events")

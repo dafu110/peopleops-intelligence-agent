@@ -1024,7 +1024,7 @@ def create_approval_request(
     subject_ref: str,
     payload: Dict[str, Any],
     requested_by: str,
-    status: str = "PENDING",
+    status: str = "DRAFT",
 ) -> int:
     timestamp = utc_now()
     with get_conn() as conn:
@@ -1101,11 +1101,12 @@ def get_approval_request(approval_id: int, *, tenant_id: Optional[str] = None) -
 
 
 APPROVAL_TRANSITIONS = {
+    "DRAFT": {"PENDING"},
     "PENDING": {"APPROVED", "REJECTED"},
     "APPROVED": {"EXECUTED", "FAILED"},
     "REJECTED": set(),
     "EXECUTED": set(),
-    "FAILED": set(),
+    "FAILED": {"PENDING"},
 }
 
 

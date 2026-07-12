@@ -51,6 +51,7 @@ import {
   getOperationsSummary,
   getProductionChecks,
   getReadiness,
+  recordOperatorEvent,
   getTaskDetail,
   getTasks,
   getToolExecutions,
@@ -260,6 +261,13 @@ export default function Home() {
       await refreshOperationalData(accessPassword);
       const task = await getTaskDetail(response.task_id, accessPassword);
       setSelectedTask(task);
+      if (response.evidence?.length) {
+        try {
+          await recordOperatorEvent(response.task_id, "citation.shown", accessPassword);
+        } catch {
+          // Observability must not turn a completed answer into a failed conversation.
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Agent 请求失败");
       setMessages((current) => [
@@ -274,7 +282,7 @@ export default function Home() {
     }
   }
 
-  async function handleApprovalAction(approvalId: number, action: "approve" | "reject" | "execute") {
+  async function handleApprovalAction(approvalId: number, action: "submit" | "approve" | "reject" | "execute" | "retry") {
     setError("");
     setPendingApprovalId(approvalId);
     try {
@@ -284,6 +292,17 @@ export default function Home() {
       setError(err instanceof Error ? err.message : "审批状态更新失败");
     } finally {
       setPendingApprovalId(null);
+    }
+  }
+
+  async function handleOperatorEvent(eventType: "candidate.adopted" | "candidate.rewritten") {
+    if (!lastTaskId) return;
+    setError("");
+    try {
+      await recordOperatorEvent(lastTaskId, eventType, accessPassword);
+      await refreshOperationalData(accessPassword);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "运营指标记录失败");
     }
   }
 
@@ -358,6 +377,7 @@ export default function Home() {
   ];
   const pendingApprovals = approvals.filter((item) => item.status === "PENDING");
   const failedToolCount = operations?.tool_status_counts?.FAILED ?? toolExecutions.filter((item) => statusClass(item.status) === "danger").length;
+  const operatorMetrics = operations?.operator_metrics;
   const tenantName = operations?.tenant_id || "default";
   const hasApiIssue = Boolean(error);
   const hasAuthGate = Boolean(health?.access_password_required && !accessPassword);
@@ -612,6 +632,12 @@ export default function Home() {
                 <p className="typing-state">正在检索制度、候选人上下文和可执行动作...</p>
               </article>
             ) : null}
+            {selectedTask?.intent === "resume" ? (
+              <div className="row-actions candidate-feedback">
+                <button type="button" onClick={() => handleOperatorEvent("candidate.adopted")}>HRBP 采纳证据</button>
+                <button type="button" onClick={() => handleOperatorEvent("candidate.rewritten")}>已人工改写</button>
+              </div>
+            ) : null}
           </div>
 
           <form className="composer" onSubmit={handleSubmit}>
@@ -695,6 +721,11 @@ export default function Home() {
                     <strong>{shortText(item.candidate_name || item.action_type || item.subject_ref, "候选人动作")}</strong>
                     <p>{item.interview_time ? `面试时间：${formatDateTime(item.interview_time)}` : "等待 HRBP 审核后执行。"}</p>
                   </div>
+                  {item.action_type && item.status === "DRAFT" ? (
+                    <div className="row-actions">
+                      <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "submit")}>提交审批</button>
+                    </div>
+                  ) : null}
                   {item.action_type && item.status === "PENDING" ? (
                     <div className="row-actions">
                       <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "approve")}>
@@ -705,6 +736,11 @@ export default function Home() {
                         <X size={13} />
                         拒绝
                       </button>
+                    </div>
+                  ) : null}
+                  {item.action_type && item.status === "FAILED" ? (
+                    <div className="row-actions">
+                      <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "retry")}>重新提交</button>
                     </div>
                   ) : null}
                 </article>
@@ -1008,6 +1044,28 @@ export default function Home() {
                   <span>工具失败</span>
                 </div>
               </div>
+              <div className="ops-summary operator-metrics">
+                <div>
+                  <strong>{operatorMetrics ? `${Math.round(operatorMetrics.adoption_rate * 100)}%` : "--"}</strong>
+                  <span>Agent 采纳率</span>
+                </div>
+                <div>
+                  <strong>{operatorMetrics ? `${Math.round(operatorMetrics.human_rewrite_rate * 100)}%` : "--"}</strong>
+                  <span>人工改写率</span>
+                </div>
+                <div>
+                  <strong>{operatorMetrics ? `${Math.round(operatorMetrics.approval_duration_seconds / 60)} 分钟` : "--"}</strong>
+                  <span>审批时长</span>
+                </div>
+                <div>
+                  <strong>{operatorMetrics ? `${Math.round(operatorMetrics.citation_open_rate * 100)}%` : "--"}</strong>
+                  <span>引用打开率</span>
+                </div>
+                <div>
+                  <strong>{operatorMetrics ? Object.keys(operatorMetrics.failure_reasons).length : 0}</strong>
+                  <span>失败原因</span>
+                </div>
+              </div>
             </section>
 
             <section className="panel-card">
@@ -1050,7 +1108,12 @@ export default function Home() {
               </div>
               <div className="citation-list">
                 {latestAssistantEvidence.slice(0, 4).map((item, index) => (
-                  <div className="citation-row evidence-card" key={`${item.source}-${index}`}>
+                  <button
+                    className="citation-row evidence-card"
+                    key={`${item.source}-${index}`}
+                    type="button"
+                    onClick={() => lastTaskId && recordOperatorEvent(lastTaskId, "citation.opened", accessPassword).catch(() => undefined)}
+                  >
                     <div className="evidence-card-head">
                       <strong>{item.source}</strong>
                       <span>{inferPageLabel(item.source)}</span>
@@ -1065,7 +1128,7 @@ export default function Home() {
                         <span key={hit}>{hit}</span>
                       ))}
                     </div>
-                  </div>
+                  </button>
                 ))}
                 {!latestAssistantEvidence.length ? (
                   <EmptyState icon={FileText} title="等待证据" body="发送一次政策问答后，这里会展示来源、片段、页码和关键词命中。" />
@@ -1131,6 +1194,11 @@ export default function Home() {
                     <span>{statusLabel(item.status)}</span>
                     <div>
                       <p>{shortText(item.candidate_name || item.action_type || item.subject_ref)}</p>
+                      {item.action_type && item.status === "DRAFT" ? (
+                        <div className="row-actions">
+                          <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "submit")}>提交审批</button>
+                        </div>
+                      ) : null}
                       {item.action_type && item.status === "PENDING" ? (
                         <div className="row-actions">
                           <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "approve")}>
@@ -1141,6 +1209,11 @@ export default function Home() {
                             <X size={13} />
                             拒绝
                           </button>
+                        </div>
+                      ) : null}
+                      {item.action_type && item.status === "FAILED" ? (
+                        <div className="row-actions">
+                          <button type="button" disabled={pendingApprovalId === item.id} onClick={() => handleApprovalAction(item.id, "retry")}>重新提交</button>
                         </div>
                       ) : null}
                       {item.action_type && item.status === "APPROVED" ? (

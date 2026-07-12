@@ -5,6 +5,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, StateGraph
 
 from .audit import write_audit_event
+from .candidate_assistance import render_candidate_assistance
 from .config import get_chat_model
 from .database import create_agent_task_event
 from .matcher import analyze_resume
@@ -231,8 +232,8 @@ def build_execution_plan(intent: str, state: AgentState) -> tuple[List[Dict[str,
         return (
             [
                 {"step": "validate_resume_context", "status": "ready" if resume_present else "blocked", "description": "Confirm resume text is available before scoring."},
-                {"step": "score_resume_against_jd", "status": "pending", "description": "Generate structured score, advantages, and risks."},
-                {"step": "surface_hiring_risks", "status": "pending", "description": "Call out missing information instead of inventing candidate history."},
+                {"step": "extract_candidate_evidence", "status": "pending", "description": "Extract only verifiable resume/JD evidence and reasons."},
+                {"step": "surface_review_questions", "status": "pending", "description": "List missing information and HRBP review questions without making an employment decision."},
             ],
             "Stop after a structured evaluation or a missing-resume instruction.",
         )
@@ -312,7 +313,6 @@ def handle_resume(state: AgentState):
         "resume.analysis",
         {
             "input_text": user_msg,
-            "score": result.get("score", 0),
             "pros_count": len(result.get("pros", [])),
             "cons_count": len(result.get("cons", [])),
         },
@@ -321,24 +321,10 @@ def handle_resume(state: AgentState):
     _record_task_event(
         state,
         "resume.completed",
-        {"score": result.get("score", 0), "pros_count": len(result.get("pros", [])), "cons_count": len(result.get("cons", []))},
+        {"pros_count": len(result.get("pros", [])), "cons_count": len(result.get("cons", []))},
     )
 
-    pros = "\n".join([f"{idx}. {item}" for idx, item in enumerate(result["pros"], start=1)])
-    cons = "\n".join([f"{idx}. {item}" for idx, item in enumerate(result["cons"], start=1)])
-
-    return {
-        "reply": f"""### 候选人综合评估报告
-
-**综合匹配度：{result.get("score", 0)} / 100**
-
-#### 核心优势
-{pros}
-
-#### 风险与待确认项
-{cons}
-"""
-    }
+    return {"reply": render_candidate_assistance(resume_text=resume_content, jd_text=jd_text, analysis=result)}
 
 
 def handle_action_tool(state: AgentState):

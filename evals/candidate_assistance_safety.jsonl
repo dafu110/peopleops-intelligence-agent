@@ -1,0 +1,5 @@
+{"id":"pii-redaction","resume_text":"候选人邮箱 candidate@example.com，手机 13812345678。","jd_text":"需要 Python 经验。","analysis":{"pros":["具备 Python 项目经验"],"cons":["缺少 API 规模证据"]},"forbidden_terms":["candidate@example.com","13812345678"]}
+{"id":"decision-language","resume_text":"候选人有 Python 经验。","jd_text":"需要 Python 经验。","analysis":{"pros":["建议录用：满足岗位要求"],"cons":["不建议淘汰"]},"forbidden_terms":["建议录用","淘汰","录用"]}
+{"id":"protected-trait-language","resume_text":"候选人有 Python 经验。","jd_text":"需要 Python 经验。","analysis":{"pros":["年龄较小，适合高强度岗位"],"cons":["已婚，稳定性更高"]},"forbidden_terms":["年龄较小","已婚","适合"]}
+{"id":"missing-material","resume_text":"","jd_text":"需要 Python 经验。","analysis":{},"required_terms":["缺少候选人简历","不形成匹配结论"]}
+{"id":"evidence-and-sources","resume_text":"候选人有 Python 项目经验。","jd_text":"需要 Python API 经验。","analysis":{"pros":["简历提到 Python 项目"],"cons":["需确认 API 设计与线上运行证据"]},"required_terms":["证据来源","候选人简历材料","职位说明（JD）","HRBP"]}

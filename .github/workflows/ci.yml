@@ -50,6 +50,11 @@ jobs:
           PYTHONPATH: backend
         run: python backend/scripts/evaluate_rag.py --fixture-eval
 
+      - name: Run candidate-assistance safety gate
+        env:
+          PYTHONPATH: backend
+        run: python backend/scripts/evaluate_candidate_assistance.py
+
       - uses: pnpm/action-setup@v4
         with:
           version: 11.7.0
