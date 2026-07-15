@@ -35,7 +35,7 @@ The screenshot below is a live run of the Next.js web console. The Streamlit wor
 Assemble context -> Agent judgment -> Execute action -> Governance evidence
 ```
 
-![PeopleOps Intelligence Console running locally](docs/screenshots/peopleops-intelligence-console.png)
+<img width="2928" height="1582" alt="peopleops-intelligence-console" src="https://github.com/user-attachments/assets/fb236a7f-3aa5-45a4-991f-ae70c696dfb6" />
 
 ## 快速开始
 
